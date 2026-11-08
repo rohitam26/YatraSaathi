@@ -1,0 +1,40 @@
+{
+  "model_name": "YatraSaathi_ArrivalConfidence_LogReg",
+  "version": "1.0.0",
+  "trained_date": "2026-11-09",
+  "dataset_type": "Synthetic Transit Telemetry (Experimental)",
+  "features": [
+    "distance_ratio",
+    "accuracy_score",
+    "freshness_score",
+    "speed_score",
+    "consecutive_samples_ratio",
+    "dwell_ratio",
+    "speed_stability",
+    "convergence_rate"
+  ],
+  "weights": [
+    -1.684038999801005,
+    0.0351209060026243,
+    0.2988992621605817,
+    -1.6462889433695023,
+    1.504868247135405,
+    2.725809049437931,
+    0.6185022401455242,
+    -1.3870335111196996
+  ],
+  "bias": -1.2458702262533345,
+  "decision_threshold": 0.5,
+  "evaluation_metrics": {
+    "accuracy": 1.0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1": 1.0,
+    "tp": 471,
+    "fp": 0,
+    "tn": 529,
+    "fn": 0,
+    "total": 1000
+  },
+  "notes": "This model is experimental and trained on synthetic data. Deterministic GPS arrival detection remains the authoritative safety gate."
+}
