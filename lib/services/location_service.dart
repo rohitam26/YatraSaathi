@@ -100,8 +100,8 @@ class LocationService {
   /// Subscribes to continuous GPS location updates with Android foreground service
   /// notification for reliable background transit monitoring.
   Stream<GpsReading> startLocationStream({
-    int distanceFilterMeters = 15,
-    int intervalSeconds = 5,
+    int distanceFilterMeters = 0,
+    int intervalSeconds = 4,
     String notificationTitle = 'YatraSaathi Journey Active',
     String notificationText = 'Monitoring arrival at upcoming stops in the background',
   }) {

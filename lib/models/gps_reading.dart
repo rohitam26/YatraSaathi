@@ -31,6 +31,9 @@ class GpsReading {
   bool get hasValidCoordinates =>
       Stop.areCoordinatesValid(latitude, longitude);
 
+  /// Helper to get vehicle speed in kilometers per hour.
+  double? get speedKmh => speedMps != null ? speedMps! * 3.6 : null;
+
   /// Helper to calculate age of this sample relative to a given point in time.
   Duration age({DateTime? referenceTime}) {
     final now = referenceTime ?? DateTime.now();

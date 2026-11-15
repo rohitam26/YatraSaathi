@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import '../models/arrival_event.dart';
 import '../models/gps_reading.dart';
 import '../models/journey.dart';
@@ -15,10 +16,10 @@ import 'distance_calculator.dart';
 class ArrivalDetector {
   ArrivalDetector({
     this.distanceCalculator = const HaversineDistanceCalculator(),
-    this.maxAcceptableAccuracyMeters = 50.0,
+    this.maxAcceptableAccuracyMeters = 80.0,
     this.maxSampleAge = const Duration(seconds: 45),
-    this.consecutiveReadingsRequired = 3,
-    this.minDwellTime = const Duration(seconds: 10),
+    this.consecutiveReadingsRequired = 2,
+    this.minDwellTime = const Duration(seconds: 4),
   }) : assert(
          maxAcceptableAccuracyMeters > 0,
          'Accuracy threshold must be positive',
@@ -135,9 +136,11 @@ class ArrivalDetector {
 
     // 8. Outside arrival radius
     if (distance > activeStop.radiusMeters) {
-      // Clear sample buffer because user is outside the radius
-      _insideRadiusSamples.clear();
-      _firstInsideTimestamp = null;
+      // Clear sample buffer only when clearly outside the radius (hysteresis buffer of 15m)
+      if (distance > activeStop.radiusMeters + 15.0) {
+        _insideRadiusSamples.clear();
+        _firstInsideTimestamp = null;
+      }
 
       return ArrivalDetectionResult(
         status: ArrivalStatus.approaching,
@@ -155,6 +158,8 @@ class ArrivalDetector {
 
     final dwell = reading.timestamp.difference(_firstInsideTimestamp!);
     final count = _insideRadiusSamples.length;
+
+    debugPrint('[ARRIVAL_EVAL @ ${now.toIso8601String()}] Stop: "${activeStop.name}", Dist: ${distance.toStringAsFixed(1)}m, Acc: ±${reading.accuracyMeters.toStringAsFixed(1)}m, Samples: $count/$consecutiveReadingsRequired, Dwell: ${dwell.inSeconds}s/${minDwellTime.inSeconds}s');
 
     // Check if conditions for arrival verification are satisfied
     final hasEnoughSamples = count >= consecutiveReadingsRequired;
@@ -196,7 +201,7 @@ class ArrivalDetector {
       dwellDuration: dwell,
       consecutiveSamples: count,
       reason:
-          'Inside arrival radius (${distance.toStringAsFixed(1)}m). Verifying stability ($count/$consecutiveReadingsRequired samples, ${dwell.inSeconds}s/${minDwellTime.inSeconds}s dwell).',
+          'Inside arrival zone ($count/$consecutiveReadingsRequired readings, dwell: ${dwell.inSeconds}s/${minDwellTime.inSeconds}s). Verifying stability...',
     );
   }
 }

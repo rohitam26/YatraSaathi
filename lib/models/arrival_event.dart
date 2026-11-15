@@ -24,6 +24,7 @@ class ArrivalEvent {
     required this.distanceMeters,
     required this.dwellDuration,
     this.isDuplicate = false,
+    this.isTestMode = false,
   });
 
   final String id;
@@ -35,6 +36,7 @@ class ArrivalEvent {
   final double distanceMeters;
   final Duration dwellDuration;
   final bool isDuplicate;
+  final bool isTestMode;
 
   Map<String, dynamic> toJson() {
     return {
@@ -47,6 +49,7 @@ class ArrivalEvent {
       'distanceMeters': distanceMeters,
       'dwellDurationMs': dwellDuration.inMilliseconds,
       'isDuplicate': isDuplicate,
+      'isTestMode': isTestMode,
     };
   }
 
@@ -65,6 +68,7 @@ class ArrivalEvent {
         milliseconds: json['dwellDurationMs'] as int? ?? 0,
       ),
       isDuplicate: json['isDuplicate'] as bool? ?? false,
+      isTestMode: json['isTestMode'] as bool? ?? false,
     );
   }
 
@@ -94,6 +98,7 @@ class ArrivalDetectionResult {
     this.consecutiveSamples = 0,
     required this.reason,
     this.event,
+    this.isTestMode = false,
   });
 
   final ArrivalStatus status;
@@ -104,6 +109,7 @@ class ArrivalDetectionResult {
   final int consecutiveSamples;
   final String reason;
   final ArrivalEvent? event;
+  final bool isTestMode;
 
   bool get isArrived => status == ArrivalStatus.arrived;
   bool get isLocationUncertain => status == ArrivalStatus.locationUncertain;
