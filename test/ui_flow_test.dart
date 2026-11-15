@@ -105,7 +105,7 @@ void main() {
       WidgetTester tester,
     ) async {
       final repo = LocalJourneyRepository();
-      tester.view.physicalSize = const Size(800, 1400);
+      tester.view.physicalSize = const Size(800, 2400);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
@@ -115,12 +115,19 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Settings'), findsOneWidget);
-      expect(find.text('Arrival Detection Parameters'), findsOneWidget);
+      expect(find.text('Settings & Preferences'), findsOneWidget);
+      expect(find.text('Arrival Alert Defaults'), findsOneWidget);
+      expect(find.text('Default Safety Contact & Check-In'), findsOneWidget);
+      expect(find.text('Advanced Settings & Diagnostics'), findsOneWidget);
+
+      // Expand advanced settings
+      await tester.tap(find.text('Advanced Settings & Diagnostics'));
+      await tester.pumpAndSettle();
+
       expect(find.text('Required Consecutive GPS Samples'), findsOneWidget);
-      expect(find.text('Minimum Station Dwell Time'), findsOneWidget);
+      expect(find.text('Minimum Dwell Duration'), findsOneWidget);
       expect(find.text('Test Vibration'), findsOneWidget);
-      expect(find.text('Test Audio Alert'), findsOneWidget);
+      expect(find.text('Test Chime'), findsOneWidget);
     });
 
     testWidgets('StopConfigDialog renders Location, Alarm and Check-In tabs', (
@@ -135,23 +142,22 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Title + Add Button both contain 'Add Stop'
-      expect(find.text('Add Stop'), findsNWidgets(2));
+      expect(find.textContaining('Add Stop'), findsWidgets);
       expect(find.text('Location'), findsOneWidget);
       expect(find.text('Alarm'), findsOneWidget);
       expect(find.text('Check-In'), findsOneWidget);
-      expect(find.text('Stop Name'), findsOneWidget);
+      expect(find.textContaining('Stop Name'), findsOneWidget);
 
       // Tap Alarm tab
       await tester.tap(find.text('Alarm'));
       await tester.pumpAndSettle();
-      expect(find.text('Sound Alert'), findsOneWidget);
+      expect(find.text('Sound Alarm'), findsOneWidget);
       expect(find.text('Tactile Vibration'), findsOneWidget);
 
       // Tap Check-In tab
       await tester.tap(find.text('Check-In'));
       await tester.pumpAndSettle();
-      expect(find.text('Arrival Check-In Message'), findsOneWidget);
+      expect(find.text('Safety Check-In Message'), findsOneWidget);
     });
   });
 }

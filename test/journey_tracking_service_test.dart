@@ -26,9 +26,13 @@ class FakeLocationService extends LocationService {
 }
 
 class FakeAlarmService extends AlarmService {
+  int disposeCalls = 0;
+
   @override
   Future<void> triggerAlarm({
     required AlarmConfig config,
+    String? stopName,
+    String? journeyTitle,
     VoidCallback? onFinished,
   }) async {
     // Test fake: do nothing
@@ -41,7 +45,10 @@ class FakeAlarmService extends AlarmService {
   void dismiss() {}
 
   @override
-  void dispose() {}
+  void dispose() {
+    disposeCalls++;
+    super.dispose();
+  }
 }
 
 class FakeMessagingService implements MessagingService {
@@ -59,8 +66,11 @@ class FakeMessagingService implements MessagingService {
     required String stopName,
     required String customMessage,
     String? journeyName,
+    bool sendDirect = false,
   }) async {
-    return MessageDeliveryStatus.composerOpened;
+    return sendDirect
+        ? MessageDeliveryStatus.sentConfirmed
+        : MessageDeliveryStatus.composerOpened;
   }
 }
 

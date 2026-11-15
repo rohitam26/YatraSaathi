@@ -5,7 +5,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   setUp(() {
-    SharedPreferences.setMockInitialValues(<String, Object>{});
+    SharedPreferences.setMockInitialValues(<String, Object>{
+      'has_completed_onboarding_v2': true,
+    });
   });
 
   testWidgets('YatraSaathi home screen displays key sections and navigates to planner', (
@@ -20,27 +22,29 @@ void main() {
 
     // Verify Active Journey status card.
     expect(find.text('Active Journey'), findsOneWidget);
-    expect(find.text('Inactive'), findsOneWidget);
-    expect(find.text('No active journey in progress.'), findsOneWidget);
+    expect(find.text('Idle'), findsOneWidget);
+    expect(find.text('No journey currently being tracked.'), findsOneWidget);
 
-    // Verify Upcoming Stops and empty state.
-    expect(find.text('Upcoming Stops'), findsOneWidget);
-    expect(find.text('No Stops Planned'), findsOneWidget);
+    // Verify Journey Stops and empty state.
+    expect(find.text('Journey Stops'), findsOneWidget);
+    expect(find.text('No upcoming stops configured.'), findsOneWidget);
 
-    // Verify Create Journey action buttons exist.
-    expect(find.text('Create Journey'), findsOneWidget);
+    // Verify Create/Plan Journey action buttons exist.
+    expect(find.text('Plan a Journey'), findsOneWidget);
     expect(find.text('New Journey'), findsOneWidget);
     expect(find.byIcon(Icons.add_road), findsOneWidget);
-    expect(find.byTooltip('Create Journey'), findsOneWidget);
+    expect(find.text('Plan Journey'), findsOneWidget);
 
-    // Tap the Create Journey button to navigate to the planner.
-    await tester.tap(find.text('Create Journey'));
+    // Tap the Plan a Journey button to navigate to the wizard.
+    await tester.tap(find.text('Plan a Journey'));
     await tester.pumpAndSettle();
 
-    // Verify we have navigated to the Journey Planner Screen.
-    expect(find.text('Create Journey'), findsOneWidget); // AppBar title
-    expect(find.text('Journey Title'), findsOneWidget);
-    expect(find.text('Stops (0)'), findsOneWidget);
-    expect(find.text('Add Stop'), findsOneWidget);
+    // Verify we have navigated to the Journey Wizard Screen.
+    expect(find.text('Plan a Journey'), findsOneWidget); // Wizard AppBar title
+    expect(find.text('Name Your Journey'), findsOneWidget);
+    expect(find.text('Journey Name *'), findsOneWidget);
+    expect(find.text('Starting Point'), findsWidgets);
+    expect(find.text('Final Destination'), findsWidgets);
+    expect(find.text('Next Step'), findsOneWidget);
   });
 }
