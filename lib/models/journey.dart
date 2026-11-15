@@ -46,12 +46,30 @@ class Journey {
 
   /// Returns the current active stop to watch for arrival, or null if none.
   Stop? get nextActiveStop {
-    if (status != JourneyStatus.active) return null;
-    if (activeStopIndex >= 0 && activeStopIndex < stops.length) {
+    if (status != JourneyStatus.active && status != JourneyStatus.paused) {
+      return null;
+    }
+    return nextStop;
+  }
+
+  /// Returns the next target stop in sequence (unreached stop), regardless of state.
+  Stop? get nextStop {
+    if (stops.isEmpty) return null;
+    if (activeStopIndex >= 0 &&
+        activeStopIndex < stops.length &&
+        !stops[activeStopIndex].isReached) {
       return stops[activeStopIndex];
     }
-    return null;
+    final unreached = stops.where((s) => !s.isReached).toList();
+    if (unreached.isNotEmpty) return unreached.first;
+    return stops.last;
   }
+
+  /// Name of the starting location or first stop.
+  String get startLocationName => stops.isNotEmpty ? stops.first.name : 'Start point';
+
+  /// Name of the final destination or last stop.
+  String get destinationName => stops.isNotEmpty ? stops.last.name : 'Destination';
 
   bool get isActive => status == JourneyStatus.active;
   bool get isPaused => status == JourneyStatus.paused;
