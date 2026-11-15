@@ -89,22 +89,27 @@ YatraSaathi addresses these needs with a 100% offline first architecture, determ
 
 ---
 
-## Application Walkthrough & Screenshots
+## Application Walkthrough & Genuine Screenshots
 
-YatraSaathi is designed with an intuitive, accessible interface optimized for travellers on the move. Explore the core application workflow below:
+YatraSaathi is designed with an intuitive, accessible interface optimized for travellers on the move. Explore the core application workflow captured directly from the installed Android application:
 
-| Home Dashboard | Journey Creation | OpenStreetMap Picker |
+| Home Dashboard | Journey Creation | Interactive Map Picker |
 | :---: | :---: | :---: |
-| <img src="assets/screenshots/01-dashboard.png" width="240" alt="YatraSaathi Home Dashboard" /> | <img src="assets/screenshots/02-journey-creation.png" width="240" alt="Journey Wizard Interface" /> | <img src="assets/screenshots/03-map-picker.png" width="240" alt="OpenStreetMap Location Picker" /> |
-| **01. Home Dashboard**<br><sub>Active journey banner, quick actions, saved routes</sub> | **02. Journey Creation**<br><sub>Multi-step route wizard with customizable alert radii</sub> | **03. Map Location Picker**<br><sub>Interactive pin dropping and geocoding search</sub> |
+| <img src="assets/screenshots/01-dashboard.png" width="220" alt="Home Dashboard" /> | <img src="assets/screenshots/02-journey-creation.png" width="220" alt="Journey Creation" /> | <img src="assets/screenshots/03-map-picker.png" width="220" alt="Interactive Map Picker" /> |
+| **01. Home Dashboard**<br><sub>Companion overview, active journey banner & saved routes</sub> | **02. Journey Creation**<br><sub>Multi-step route wizard with start point and destination</sub> | **03. Interactive Map Picker**<br><sub>OpenStreetMap pin placement with live place search</sub> |
 
-| Active Tracking | Arrival Alert | Safety Contacts | Ringtone Selection |
+| Stop Configuration | Arrival Alert Preferences | Safety Check-in |
+| :---: | :---: | :---: |
+| <img src="assets/screenshots/04-stop-configuration.png" width="220" alt="Stop Configuration" /> | <img src="assets/screenshots/05-arrival-alert-settings.png" width="220" alt="Arrival Alert Preferences" /> | <img src="assets/screenshots/06-safety-checkin.png" width="220" alt="Safety Check-in" /> |
+| **04. Stop Configuration**<br><sub>Intermediate stop management and 500m alert radius</sub> | **05. Arrival Alert Preferences**<br><sub>Audible chime selection, vibration & snooze timing</sub> | **06. Safety Check-in**<br><sub>Emergency contact selection and SMS preview</sub> |
+
+| Active Journey Tracking | Arrival Notification | Journey Completed | Safety Profile |
 | :---: | :---: | :---: | :---: |
-| <img src="assets/screenshots/04-active-tracking.png" width="240" alt="Active Journey Tracking" /> | <img src="assets/screenshots/05-arrival-alert.png" width="240" alt="Arrival Alarm Modal" /> | <img src="assets/screenshots/06-safety-contacts.png" width="240" alt="Safety Contacts Management" /> | <img src="assets/screenshots/07-ringtone-selection.png" width="240" alt="Ringtone Selector & Audition" /> |
-| **04. Live Tracking**<br><sub>Real-time distance countdown and route map</sub> | **05. Arrival Alarm**<br><sub>Loud alarm popup with snooze & dismiss</sub> | **06. Safety Contacts**<br><sub>Emergency numbers & check-in template</sub> | **07. Ringtone Selection**<br><sub>Instant play/pause preview and volume</sub> |
+| <img src="assets/screenshots/07-active-journey.png" width="220" alt="Active Journey Tracking" /> | <img src="assets/screenshots/08-arrival-notification.png" width="220" alt="Arrival Notification" /> | <img src="assets/screenshots/09-journey-completed.png" width="220" alt="Journey Completed" /> | <img src="assets/screenshots/10-safety-profile.png" width="220" alt="Safety Profile" /> |
+| **07. Active Journey Tracking**<br><sub>Real-time distance countdown, GPS lock & arrival confidence</sub> | **08. Arrival Notification**<br><sub>Loud arrival modal with one-tap SMS composer launch</sub> | **09. Journey Completed**<br><sub>Trip completion summary and return to dashboard</sub> | **10. Safety Profile**<br><sub>Passenger identity and default emergency contacts</sub> |
 
 > [!NOTE]
-> Detailed capture guidelines, specifications, and layout instructions are documented in [`assets/screenshots/README.md`](assets/screenshots/README.md).
+> All ten screenshots are genuine Android application captures with masked phone numbers. Complete documentation is provided in [`assets/screenshots/README.md`](assets/screenshots/README.md).
 
 ---
 
@@ -198,7 +203,7 @@ The project maintains 100% passing automated test coverage across its services, 
 YatraSaathi/
 ├── android/                   # Native Android manifest, Kotlin MainActivity, and Gradle setup
 ├── assets/
-│   ├── screenshots/          # Application screenshot placeholders
+│   ├── screenshots/          # Ten genuine application screenshots (.png)
 │   └── sounds/               # Packaged original audio ringtones (.wav)
 ├── lib/
 │   ├── main.dart             # Application entrypoint & Dashboard
