@@ -163,16 +163,17 @@ YatraSaathi is designed with an intuitive, accessible interface optimized for tr
 
 ---
 
-## Permissions & Privacy Policy
+## Privacy Policy & Data Handling
 
-YatraSaathi is committed to complete user privacy:
+YatraSaathi is committed to complete user transparency and privacy-first engineering:
 
-- **100% Offline Storage:** All journeys, stops, user profiles, and safety contacts are stored exclusively on your device using local storage. Zero data is uploaded to external servers.
-- **Zero Third-Party Telemetry:** No analytics SDKs, advertising trackers, or external database connections are used.
-- **Location Permissions (`ACCESS_FINE_LOCATION`, `ACCESS_BACKGROUND_LOCATION`):** Required strictly for calculating distance to your destination stops while transit is active.
-- **Notification Permission (`POST_NOTIFICATIONS`):** Required on Android 13+ to post foreground service tracking notices and high-priority arrival alarms.
-- **Audio & Vibration Permissions (`MODIFY_AUDIO_SETTINGS`, `VIBRATE`):** Used to route loud alerts through the device speaker (`STREAM_ALARM`) and execute tactile vibrations.
-- **SMS Policy & Direct SMS Limitations (`SEND_SMS`):** Direct background SMS sending via Android `SmsManager` is restricted by Google Play policies. In compliance with these policies, YatraSaathi uses the native SMS Composer as its default, safe workflow. Direct SMS mode is available only when manually enabled by the user in private/sideloaded builds.
+- **Complete Policy Documentation:** Read the full legal document in [`PRIVACY_POLICY.md`](PRIVACY_POLICY.md) or view the responsive web page in [`docs/privacy-policy.html`](docs/privacy-policy.html).
+- **100% On-Device Location Processing:** GPS coordinates are processed exclusively on your device to calculate distance to upcoming stops. Coordinates are never transmitted to, logged on, or shared with external servers during transit tracking.
+- **Local Storage:** All journeys, stops, user profiles, and safety contacts are stored in your device's private `SharedPreferences`. Zero data is uploaded to cloud databases.
+- **Zero Third-Party Telemetry:** No analytics SDKs, advertising trackers, or external telemetry libraries are embedded in the application.
+- **Map & Geocoding Services:** Map tiles are loaded via HTTPS from OpenStreetMap (`tile.openstreetmap.org`). Destination search and reverse geocoding queries are sent to Komoot Photon (`photon.komoot.io`) and OSM Nominatim (`nominatim.openstreetmap.org`) strictly when actively interacting with the location picker.
+- **SMS Telephony Compliance:** In accordance with Google Play Store permissions policies, YatraSaathi uses the native Android SMS composer (`url_launcher` via `sms:`) as its default, secure check-in workflow. Direct background SMS via Android `SmsManager` is restricted to private, user-consented sideload builds.
+- **Permissions Overview:** The app requires `ACCESS_FINE_LOCATION`, `ACCESS_BACKGROUND_LOCATION`, `FOREGROUND_SERVICE_LOCATION`, `POST_NOTIFICATIONS`, `VIBRATE`, and `MODIFY_AUDIO_SETTINGS` strictly for core transit alert functionality.
 
 ---
 

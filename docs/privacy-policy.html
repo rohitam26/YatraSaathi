@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy Policy — YatraSaathi</title>
+  <meta name="description" content="Privacy Policy for YatraSaathi, the offline-first Flutter GPS journey companion and arrival alert application.">
+  <style>
+    :root {
+      --primary: #1E3A8A;
+      --primary-light: #3B82F6;
+      --accent: #F59E0B;
+      --bg: #F8FAFC;
+      --surface: #FFFFFF;
+      --text: #0F172A;
+      --text-muted: #475569;
+      --border: #E2E8F0;
+      --card-bg: #FFFFFF;
+      --badge-bg: #EFF6FF;
+      --badge-text: #1D4ED8;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --primary: #60A5FA;
+        --primary-light: #93C5FD;
+        --accent: #FBBF24;
+        --bg: #0F172A;
+        --surface: #1E293B;
+        --text: #F1F5F9;
+        --text-muted: #94A3B8;
+        --border: #334155;
+        --card-bg: #1E293B;
+        --badge-bg: #1E3A8A;
+        --badge-text: #93C5FD;
+      }
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.65;
+      padding: 0 1rem;
+    }
+    header {
+      max-width: 860px;
+      margin: 2.5rem auto 1.5rem;
+      padding-bottom: 1.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .brand {
+      display: inline-block;
+      font-size: 0.875rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--primary);
+      margin-bottom: 0.5rem;
+    }
+    h1 {
+      font-size: 2.25rem;
+      line-height: 1.25;
+      margin-bottom: 0.75rem;
+      color: var(--text);
+    }
+    .meta {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+    }
+    main {
+      max-width: 860px;
+      margin: 0 auto 3rem;
+    }
+    section {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.75rem;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    h2 {
+      font-size: 1.35rem;
+      color: var(--primary);
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+    h3 {
+      font-size: 1.1rem;
+      margin: 1.25rem 0 0.5rem;
+      color: var(--text);
+    }
+    p { margin-bottom: 0.9rem; }
+    p:last-child { margin-bottom: 0; }
+    ul, ol {
+      margin-left: 1.5rem;
+      margin-bottom: 1rem;
+    }
+    li { margin-bottom: 0.4rem; }
+    strong { color: var(--text); }
+    .table-responsive {
+      overflow-x: auto;
+      margin: 1rem 0;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+      text-align: left;
+    }
+    th, td {
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+    th {
+      background: var(--surface);
+      color: var(--text);
+      font-weight: 600;
+    }
+    tr:last-child td { border-bottom: none; }
+    .badge {
+      display: inline-block;
+      padding: 0.2rem 0.5rem;
+      background: var(--badge-bg);
+      color: var(--badge-text);
+      font-size: 0.75rem;
+      font-weight: 600;
+      border-radius: 4px;
+      font-family: monospace;
+    }
+    .highlight-card {
+      background: var(--surface);
+      border-left: 4px solid var(--primary-light);
+      padding: 1rem;
+      border-radius: 0 8px 8px 0;
+      margin: 1rem 0;
+    }
+    footer {
+      max-width: 860px;
+      margin: 2rem auto 4rem;
+      text-align: center;
+      font-size: 0.875rem;
+      color: var(--text-muted);
+      border-top: 1px solid var(--border);
+      padding-top: 1.5rem;
+    }
+    a {
+      color: var(--primary-light);
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <span class="brand">YatraSaathi • Privacy Document</span>
+    <h1>Privacy Policy</h1>
+    <div class="meta">
+      <strong>Effective Date:</strong> March 15, 2026 | 
+      <strong>Application:</strong> YatraSaathi (<code>com.example.pathsaathi</code>) |
+      <strong>License:</strong> MIT
+    </div>
+  </header>
+
+  <main>
+    <section>
+      <h2>1. Introduction</h2>
+      <p>YatraSaathi ("the Application", "we", "our") is an open-source travel companion application built with Flutter for Android. The application monitors travel progress, triggers audible arrival alarms at pre-configured stations, and facilitates safety check-in messages to emergency contacts.</p>
+      <p>We believe personal location history is private. This document provides complete transparency regarding how YatraSaathi processes data locally on your device, what minimal network services are contacted, and how your privacy is protected.</p>
+    </section>
+
+    <section>
+      <h2>2. Scope of the Policy</h2>
+      <p>This policy applies to the YatraSaathi mobile application. YatraSaathi operates with an offline-first architecture without cloud servers, remote databases, user registration, or advertising telemetry.</p>
+    </section>
+
+    <section>
+      <h2>3. Information the Application Accesses</h2>
+      <ul>
+        <li><strong>Geographic Location:</strong> High-precision GPS coordinates, horizontal accuracy, speed, and timestamps.</li>
+        <li><strong>Passenger Profile & Contacts:</strong> User display name, mobile phone number, designated emergency contact names, and phone numbers.</li>
+        <li><strong>Journey Configurations:</strong> Stop titles, coordinates, alert radii, and custom check-in message templates.</li>
+        <li><strong>Hardware Capabilities:</strong> Android alarm audio stream (<code>STREAM_ALARM</code>), vibration hardware, wake lock, and system notifications.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>4. Location Information & On-Device Processing</h2>
+      <p>When tracking is active, YatraSaathi reads device GPS coordinates to calculate remaining distance using the spherical Haversine formula.</p>
+      <div class="highlight-card">
+        <strong>Zero Location Telemetry:</strong> All GPS distance computations, accuracy evaluations, and dwell-time checks take place <strong>100% on your device</strong>. Your coordinates are never sent to or logged on any external server during journey tracking.
+      </div>
+      <h3>Background Location & Foreground Service</h3>
+      <p>To ensure alerts sound even when the screen is locked, YatraSaathi runs an Android Foreground Service with a persistent status notification. You can pause or cancel tracking at any time.</p>
+    </section>
+
+    <section>
+      <h2>5. Journey, Destination & Profile Data</h2>
+      <p>All journey stops, custom radii, emergency contacts, and passenger settings are saved strictly in your device's private local storage (<code>SharedPreferences</code>). No travel itineraries are uploaded to any server or cloud database.</p>
+    </section>
+
+    <section>
+      <h2>6. SMS and Safety Check-In Messages</h2>
+      <h3>Native SMS Composer (Default)</h3>
+      <p>Upon arrival, YatraSaathi prepares a pre-filled check-in message and opens your native Android SMS application using an <code>sms:</code> intent. <strong>No message is sent automatically without you pressing "Send" in your SMS app.</strong></p>
+      <h3>Direct SMS Background Service (Private / Sideload Builds Only)</h3>
+      <p>For custom sideloaded builds where automated background dispatch is explicitly desired, direct telephony via Android's <code>SmsManager</code> is supported only after explicit user configuration and runtime permission approval (<code>SEND_SMS</code>). This feature is disabled by default.</p>
+    </section>
+
+    <section>
+      <h2>7. External Map & Geocoding Services</h2>
+      <p>To provide visual map picking and address lookup, YatraSaathi contacts standard public map APIs via HTTPS:</p>
+      <div class="table-responsive">
+        <table>
+          <thead>
+            <tr>
+              <th>Provider</th>
+              <th>Purpose</th>
+              <th>Data Transmitted</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>OpenStreetMap</strong><br><code>tile.openstreetmap.org</code></td>
+              <td>Displays map imagery in the location picker.</td>
+              <td>Tile coordinates ($z, x, y$), standard User-Agent header, device IP.</td>
+            </tr>
+            <tr>
+              <td><strong>Komoot Photon</strong><br><code>photon.komoot.io</code></td>
+              <td>Primary destination search by name.</td>
+              <td>User search query string (e.g. landmark or station name).</td>
+            </tr>
+            <tr>
+              <td><strong>Nominatim (OSM)</strong><br><code>nominatim.openstreetmap.org</code></td>
+              <td>Reverse geocoding (coordinates to address label).</td>
+              <td>Tapped latitude/longitude coordinates, User-Agent header.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p><em>These requests occur only when actively browsing the map or searching for a location—never during background transit tracking.</em></p>
+    </section>
+
+    <section>
+      <h2>8. Data Sharing & Third-Party Trackers</h2>
+      <ul>
+        <li><strong>No Analytics SDKs:</strong> No Google Analytics, Firebase, Sentry, or tracking tools are embedded.</li>
+        <li><strong>No Advertising Networks:</strong> Zero ads and zero advertising identifiers.</li>
+        <li><strong>No Data Monetization:</strong> We never collect, sell, or rent personal data.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>9. Permissions & User Control</h2>
+      <div class="table-responsive">
+        <table>
+          <thead>
+            <tr>
+              <th>Permission</th>
+              <th>Type</th>
+              <th>Purpose</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="badge">ACCESS_FINE_LOCATION</span></td>
+              <td>Location</td>
+              <td>Real-time GPS proximity detection for destination alarms.</td>
+            </tr>
+            <tr>
+              <td><span class="badge">ACCESS_BACKGROUND_LOCATION</span></td>
+              <td>Location</td>
+              <td>Monitors travel progress while the screen is locked or idle.</td>
+            </tr>
+            <tr>
+              <td><span class="badge">FOREGROUND_SERVICE_LOCATION</span></td>
+              <td>Service</td>
+              <td>Android 14+ requirement for foreground transit tracking.</td>
+            </tr>
+            <tr>
+              <td><span class="badge">POST_NOTIFICATIONS</span></td>
+              <td>Notifications</td>
+              <td>Displays persistent tracking status and high-priority alarms.</td>
+            </tr>
+            <tr>
+              <td><span class="badge">VIBRATE</span> & <span class="badge">MODIFY_AUDIO_SETTINGS</span></td>
+              <td>Hardware</td>
+              <td>Tactile feedback and alarm audio routing via <code>STREAM_ALARM</code>.</td>
+            </tr>
+            <tr>
+              <td><span class="badge">SEND_SMS</span> (Optional)</td>
+              <td>Telephony</td>
+              <td>Direct background SMS dispatch (private custom builds only).</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2>10. Data Retention & Deletion</h2>
+      <p>You have full ownership of your data. You may edit or delete saved journeys and contacts inside the application at any time. Clearing application data in Android System Settings or uninstalling YatraSaathi permanently wipes all local data.</p>
+    </section>
+
+    <section>
+      <h2>11. Contact & Open-Source Repository</h2>
+      <p>YatraSaathi is developed as an open-source project. For inquiries, audits, or support:</p>
+      <ul>
+        <li><strong>Maintainer:</strong> Rohit (<a href="https://github.com/rohitam26" target="_blank" rel="noopener">@rohitam26</a>)</li>
+        <li><strong>Repository:</strong> <a href="https://github.com/rohitam26/YatraSaathi-" target="_blank" rel="noopener">https://github.com/rohitam26/YatraSaathi-</a></li>
+        <li><strong>Issue Tracker:</strong> <a href="https://github.com/rohitam26/YatraSaathi-/issues" target="_blank" rel="noopener">GitHub Issues</a></li>
+      </ul>
+    </section>
+  </main>
+
+  <footer>
+    <p>&copy; 2026 YatraSaathi Project • Licensed under the MIT License.</p>
+    <p><a href="https://github.com/rohitam26/YatraSaathi-">GitHub Source Code</a></p>
+  </footer>
+
+</body>
+</html>
