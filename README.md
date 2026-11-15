@@ -11,9 +11,15 @@
 
 ## About the Project
 
-"I tend to miss my stop while travelling. I wanted an application that could alert me when I reached a planned location and help notify my family, so I wouldn't have to remember to send a check-in message every time."
+I often found myself worrying about missing my stop while travelling. Whether on a crowded train, a long distance bus, or an unfamiliar route, it is easy to lose track of your journey. I wanted to build something that would alert me when I reached my destination and help keep my family informed without relying on me to remember every check-in.
 
-YatraSaathi was built from this personal experience. When travelling on crowded trains, long-distance buses, or navigating unfamiliar transit networks, it is easy to lose track of time or miss an intermediate station while resting. YatraSaathi acts as a dependable travel companion that monitors your progress via GPS in the background, sounds loud audible arrival ringtones when your stop is reached, and prepares or dispatches automated safety check-in messages to your emergency contacts.
+YatraSaathi is a GPS-powered journey monitoring and personal travel safety application developed to address these everyday challenges.
+
+Designed as a digital travel companion, YatraSaathi enables users to plan journeys with multiple stops, monitor their location during transit, and receive audible alerts when approaching or reaching a designated destination. It also integrates safety contact management and arrival check-in messaging to help users keep their trusted contacts informed throughout their journey.
+
+The application brings together location intelligence, proximity-based arrival detection, configurable alarm notifications, and safety messaging within a unified mobile experience. Its design prioritises practical usability, user control, and privacy-conscious handling of journey information.
+
+Rather than requiring travellers to continuously monitor a navigation screen, YatraSaathi aims to make journey awareness more proactive, helping users stay informed while they focus on travelling.
 
 ---
 
@@ -21,10 +27,12 @@ YatraSaathi was built from this personal experience. When travelling on crowded 
 
 Daily commuters and long-distance passengers face recurring transit challenges:
 
-- **Missing Planned Stops:** Falling asleep or getting distracted during transit often leads to missing crucial interchange stations or final destinations.
-- **Forgetting Arrival Check-Ins:** Loved ones waiting at home worry when travellers forget to confirm safe arrival at intermediate or final stops.
-- **Fragmented Monitoring:** Most navigation apps demand continuous active screen time, draining battery and consuming data.
-- **Privacy Intrusion:** Many tracking solutions rely on cloud servers, accounts, and constant background telemetry that share personal location history.
+- **Unintended Destination Overshooting:** : Passengers may fall asleep, become distracted, or lose awareness of their location, resulting in missed destinations and intermediate stops.
+- **Continuous Screen Dependency** Traditional navigation experiences often require users to periodically check their devices, which can be inconvenient during long journeys, crowded commutes, or periods of rest.
+- **Limited Personalised Arrival Alerts:** General-purpose navigation tools may not provide the combination of configurable proximity-based alerts, repeatable alarms, and journey-specific safety check-ins that some commuters need.
+- **Inconsistent Safety Check-ins:**Travellers may forget to notify family members or trusted contacts after reaching their destination, creating unnecessary uncertainty for people waiting for confirmation.
+- **Privacy and Data Dependence:** Location-based applications can introduce concerns around continuous location sharing, account requirements, and the handling of personal travel information.
+
 
 YatraSaathi addresses these needs with a 100% offline-first architecture, deterministic GPS arrival detection, hardware-level alarms, and privacy-respecting safety messaging.
 
