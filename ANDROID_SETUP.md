@@ -6,10 +6,10 @@ This guide details the prerequisites, build configuration, permissions setup, an
 
 ## 1. Development & Build Prerequisites
 
-- **Flutter SDK:** 3.47.8 or higher (`E:\develop\flutter`)
+- **Flutter SDK:** 3.47.8 or higher
 - **Dart SDK:** 3.13.7
-- **Android SDK:** Version 36.0.0 (API 37 Platform installed at `E:\Android\Sdk`)
-- **Java JDK:** OpenJDK 17 or 21 (Bundled Android Studio JBR at `C:\Program Files\Android\Android Studio\jbr`)
+- **Android SDK:** API 34+ (Build Tools 36.0.0+)
+- **Java JDK:** OpenJDK 17 or 21 (or Android Studio JBR)
 - **Android Gradle Plugin / Kotlin:** JVM 17 target compatibility configured in `android/app/build.gradle.kts`.
 
 ---
