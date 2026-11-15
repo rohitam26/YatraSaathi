@@ -89,13 +89,22 @@ YatraSaathi addresses these needs with a 100% offline first architecture, determ
 
 ---
 
-## Screenshots
+## Application Walkthrough & Screenshots
 
-Placeholders for application walkthrough screenshots located in [`assets/screenshots/`](assets/screenshots/README.md):
+YatraSaathi is designed with an intuitive, accessible interface optimized for travellers on the move. Explore the core application workflow below:
 
-| Home Dashboard | Journey Creation | Active Tracking | Arrival Alert |
+| Home Dashboard | Journey Creation | OpenStreetMap Picker |
+| :---: | :---: | :---: |
+| <img src="assets/screenshots/01-dashboard.png" width="240" alt="YatraSaathi Home Dashboard" /> | <img src="assets/screenshots/02-journey-creation.png" width="240" alt="Journey Wizard Interface" /> | <img src="assets/screenshots/03-map-picker.png" width="240" alt="OpenStreetMap Location Picker" /> |
+| **01. Home Dashboard**<br><sub>Active journey banner, quick actions, saved routes</sub> | **02. Journey Creation**<br><sub>Multi-step route wizard with customizable alert radii</sub> | **03. Map Location Picker**<br><sub>Interactive pin dropping and geocoding search</sub> |
+
+| Active Tracking | Arrival Alert | Safety Contacts | Ringtone Selection |
 | :---: | :---: | :---: | :---: |
-| *`01_dashboard.png`* | *`02_journey_wizard.png`* | *`04_active_tracking.png`* | *`05_arrival_alert.png`* |
+| <img src="assets/screenshots/04-active-tracking.png" width="240" alt="Active Journey Tracking" /> | <img src="assets/screenshots/05-arrival-alert.png" width="240" alt="Arrival Alarm Modal" /> | <img src="assets/screenshots/06-safety-contacts.png" width="240" alt="Safety Contacts Management" /> | <img src="assets/screenshots/07-ringtone-selection.png" width="240" alt="Ringtone Selector & Audition" /> |
+| **04. Live Tracking**<br><sub>Real-time distance countdown and route map</sub> | **05. Arrival Alarm**<br><sub>Loud alarm popup with snooze & dismiss</sub> | **06. Safety Contacts**<br><sub>Emergency numbers & check-in template</sub> | **07. Ringtone Selection**<br><sub>Instant play/pause preview and volume</sub> |
+
+> [!NOTE]
+> Detailed capture guidelines, specifications, and layout instructions are documented in [`assets/screenshots/README.md`](assets/screenshots/README.md).
 
 ---
 
