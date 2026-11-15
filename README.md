@@ -30,11 +30,11 @@ Daily commuters and long-distance passengers face recurring transit challenges:
 - **Unintended Destination Overshooting:** : Passengers may fall asleep, become distracted, or lose awareness of their location, resulting in missed destinations and intermediate stops.
 - **Continuous Screen Dependency** Traditional navigation experiences often require users to periodically check their devices, which can be inconvenient during long journeys, crowded commutes, or periods of rest.
 - **Limited Personalised Arrival Alerts:** General-purpose navigation tools may not provide the combination of configurable proximity-based alerts, repeatable alarms, and journey-specific safety check-ins that some commuters need.
-- **Inconsistent Safety Check-ins:**Travellers may forget to notify family members or trusted contacts after reaching their destination, creating unnecessary uncertainty for people waiting for confirmation.
+- **Inconsistent Safety Check-ins:** Travellers may forget to notify family members or trusted contacts after reaching their destination, creating unnecessary uncertainty for people waiting for confirmation.
 - **Privacy and Data Dependence:** Location-based applications can introduce concerns around continuous location sharing, account requirements, and the handling of personal travel information.
 
 
-YatraSaathi addresses these needs with a 100% offline-first architecture, deterministic GPS arrival detection, hardware-level alarms, and privacy-respecting safety messaging.
+YatraSaathi addresses these needs with a 100% offline first architecture, deterministic GPS arrival detection, hardware level alarms, and privacy respecting safety messaging.
 
 ---
 
