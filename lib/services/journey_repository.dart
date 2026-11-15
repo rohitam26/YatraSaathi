@@ -1,8 +1,10 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/journey.dart';
+import '../models/safety_contact.dart';
+import '../models/user_profile.dart';
 
-/// Repository interface for managing journey persistence.
+/// Repository interface for managing journey persistence and safety contacts.
 abstract class JourneyRepository {
   Future<List<Journey>> getJourneys();
   Future<Journey?> getJourney(String id);
@@ -10,6 +12,12 @@ abstract class JourneyRepository {
   Future<void> deleteJourney(String id);
   Future<Journey?> getActiveJourney();
   Future<void> setActiveJourneyId(String? id);
+  Future<UserProfile> getUserProfile();
+  Future<void> saveUserProfile(UserProfile profile);
+  Future<List<SafetyContact>> getSafetyContacts();
+  Future<void> saveSafetyContact(SafetyContact contact);
+  Future<void> deleteSafetyContact(String id);
+  Future<void> setPrimaryContact(String id);
   Future<void> clearAll();
 }
 
@@ -23,6 +31,8 @@ class LocalJourneyRepository implements JourneyRepository {
 
   static const String _journeysKey = 'yatrasaathi_saved_journeys_v1';
   static const String _activeJourneyIdKey = 'yatrasaathi_active_journey_id_v1';
+  static const String _userProfileKey = 'yatrasaathi_user_profile_v1';
+  static const String _safetyContactsKey = 'yatrasaathi_safety_contacts_v1';
 
   Future<SharedPreferences> get _prefs async =>
       _preferencesOverride ?? await SharedPreferences.getInstance();
@@ -126,9 +136,143 @@ class LocalJourneyRepository implements JourneyRepository {
   }
 
   @override
+  Future<UserProfile> getUserProfile() async {
+    final prefs = await _prefs;
+    final jsonStr = prefs.getString(_userProfileKey);
+    if (jsonStr == null || jsonStr.isEmpty) {
+      // Legacy fallback
+      final name = prefs.getString('pref_contact_name') ?? '';
+      final phone = prefs.getString('pref_contact_phone') ?? '';
+      final msg = prefs.getString('pref_checkin_msg') ?? '';
+      if (name.isNotEmpty || phone.isNotEmpty) {
+        return UserProfile(
+          defaultContactName: name,
+          defaultContactPhone: phone,
+          defaultMessage: msg.isNotEmpty
+              ? msg
+              : 'Hi! I have safely reached my stop. - Sent via YatraSaathi',
+        );
+      }
+      return const UserProfile();
+    }
+    try {
+      final map = jsonDecode(jsonStr) as Map<String, dynamic>;
+      return UserProfile.fromJson(map);
+    } catch (_) {
+      return const UserProfile();
+    }
+  }
+
+  @override
+  Future<void> saveUserProfile(UserProfile profile) async {
+    final prefs = await _prefs;
+    await prefs.setString(_userProfileKey, jsonEncode(profile.toJson()));
+    // Sync legacy keys for backward compatibility
+    await prefs.setString('pref_contact_name', profile.defaultContactName);
+    await prefs.setString('pref_contact_phone', profile.defaultContactPhone);
+    await prefs.setString('pref_checkin_msg', profile.defaultMessage);
+  }
+
+  @override
+  Future<List<SafetyContact>> getSafetyContacts() async {
+    final prefs = await _prefs;
+    final jsonStrings = prefs.getStringList(_safetyContactsKey);
+
+    if (jsonStrings == null || jsonStrings.isEmpty) {
+      // Automatic migration: If no contacts saved yet, inspect UserProfile
+      final profile = await getUserProfile();
+      if (profile.hasDefaultContact) {
+        final migrated = SafetyContact(
+          id: 'contact_migrated_primary',
+          name: profile.defaultContactName,
+          phoneNumber: profile.defaultContactPhone,
+          countryCode: profile.countryCode,
+          relationship: profile.defaultContactRelation,
+          isPrimary: true,
+          createdAt: DateTime.now(),
+        );
+        await prefs.setStringList(_safetyContactsKey, [jsonEncode(migrated.toJson())]);
+        return [migrated];
+      }
+      return <SafetyContact>[];
+    }
+
+    final contacts = <SafetyContact>[];
+    for (final str in jsonStrings) {
+      try {
+        final map = jsonDecode(str) as Map<String, dynamic>;
+        contacts.add(SafetyContact.fromJson(map));
+      } catch (_) {}
+    }
+
+    // Sort: primary first, then newest
+    contacts.sort((a, b) {
+      if (a.isPrimary != b.isPrimary) return a.isPrimary ? -1 : 1;
+      return b.createdAt.compareTo(a.createdAt);
+    });
+    return contacts;
+  }
+
+  @override
+  Future<void> saveSafetyContact(SafetyContact contact) async {
+    final prefs = await _prefs;
+    final contacts = await getSafetyContacts();
+
+    // If marked primary, ensure other contacts are un-marked
+    if (contact.isPrimary) {
+      for (int i = 0; i < contacts.length; i++) {
+        if (contacts[i].id != contact.id) {
+          contacts[i] = contacts[i].copyWith(isPrimary: false);
+        }
+      }
+    }
+
+    final index = contacts.indexWhere((c) => c.id == contact.id);
+    if (index >= 0) {
+      contacts[index] = contact;
+    } else {
+      // If this is the only contact, automatically mark it primary
+      final toAdd = contacts.isEmpty ? contact.copyWith(isPrimary: true) : contact;
+      contacts.add(toAdd);
+    }
+
+    final jsonList = contacts.map((c) => jsonEncode(c.toJson())).toList();
+    await prefs.setStringList(_safetyContactsKey, jsonList);
+  }
+
+  @override
+  Future<void> deleteSafetyContact(String id) async {
+    final prefs = await _prefs;
+    final contacts = await getSafetyContacts();
+    final removed = contacts.where((c) => c.id == id).firstOrNull;
+    contacts.removeWhere((c) => c.id == id);
+
+    // If the removed contact was primary, promote the next available contact
+    if (removed?.isPrimary == true && contacts.isNotEmpty) {
+      contacts[0] = contacts[0].copyWith(isPrimary: true);
+    }
+
+    final jsonList = contacts.map((c) => jsonEncode(c.toJson())).toList();
+    await prefs.setStringList(_safetyContactsKey, jsonList);
+  }
+
+  @override
+  Future<void> setPrimaryContact(String id) async {
+    final prefs = await _prefs;
+    final contacts = await getSafetyContacts();
+    for (int i = 0; i < contacts.length; i++) {
+      contacts[i] = contacts[i].copyWith(isPrimary: contacts[i].id == id);
+    }
+    final jsonList = contacts.map((c) => jsonEncode(c.toJson())).toList();
+    await prefs.setStringList(_safetyContactsKey, jsonList);
+  }
+
+  @override
   Future<void> clearAll() async {
     final prefs = await _prefs;
     await prefs.remove(_journeysKey);
     await prefs.remove(_activeJourneyIdKey);
+    await prefs.remove(_userProfileKey);
+    await prefs.remove(_safetyContactsKey);
   }
 }
