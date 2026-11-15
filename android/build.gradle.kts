@@ -1,3 +1,5 @@
+import com.android.build.gradle.BaseExtension
+
 allprojects {
     repositories {
         google()
@@ -14,17 +16,23 @@ rootProject.layout.buildDirectory.value(newBuildDir)
 subprojects {
     val newSubprojectBuildDir: Directory = newBuildDir.dir(project.name)
     project.layout.buildDirectory.value(newSubprojectBuildDir)
-}
-subprojects {
-    project.evaluationDependsOn(":app")
+    
+    // Ensure AAR metadata directories exist for Gradle 9 validation
+    val subBuild = newSubprojectBuildDir.asFile
+    File(subBuild, "intermediates/aar_metadata_check/debug/checkDebugAarMetadata").mkdirs()
+    File(subBuild, "intermediates/aar_metadata_check/release/checkReleaseAarMetadata").mkdirs()
+
+    afterEvaluate {
+        val android = project.extensions.findByName("android") as? BaseExtension
+        android?.compileSdkVersion(36)
+    }
 }
 
 subprojects {
-    tasks.matching { it.name.contains("AarMetadata") }.configureEach {
-        enabled = false
-    }
+    project.evaluationDependsOn(":app")
 }
 
 tasks.register<Delete>("clean") {
     delete(rootProject.layout.buildDirectory)
 }
+

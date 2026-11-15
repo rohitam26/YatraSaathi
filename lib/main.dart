@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'models/journey.dart';
 import 'services/alarm_service.dart';
 import 'services/journey_repository.dart';
 import 'services/journey_tracking_service.dart';
 import 'services/location_service.dart';
 import 'ui/active_journey_screen.dart';
-import 'ui/journey_planner_screen.dart';
+import 'ui/first_launch_onboarding_screen.dart';
+import 'ui/journey_wizard_screen.dart';
 import 'ui/permission_guidance_screen.dart';
 import 'ui/privacy_info_screen.dart';
+import 'ui/safety_contacts_screen.dart';
 import 'ui/saved_journeys_screen.dart';
 import 'ui/settings_screen.dart';
 
@@ -17,7 +20,7 @@ void main() {
 }
 
 /// The root application widget for YatraSaathi.
-class YatraSaathiApp extends StatelessWidget {
+class YatraSaathiApp extends StatefulWidget {
   const YatraSaathiApp({
     super.key,
     this.repository,
@@ -26,6 +29,38 @@ class YatraSaathiApp extends StatelessWidget {
 
   final JourneyRepository? repository;
   final JourneyTrackingService? trackingService;
+
+  @override
+  State<YatraSaathiApp> createState() => _YatraSaathiAppState();
+}
+
+class _YatraSaathiAppState extends State<YatraSaathiApp> {
+  bool _isLoading = true;
+  bool _hasCompletedOnboarding = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkOnboarding();
+  }
+
+  Future<void> _checkOnboarding() async {
+    final prefs = await SharedPreferences.getInstance();
+    final completed =
+        prefs.getBool(FirstLaunchOnboardingScreen.prefKeyCompleted) ?? false;
+    if (mounted) {
+      setState(() {
+        _hasCompletedOnboarding = completed;
+        _isLoading = false;
+      });
+    }
+  }
+
+  void _onOnboardingComplete() {
+    setState(() {
+      _hasCompletedOnboarding = true;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -47,10 +82,16 @@ class YatraSaathiApp extends StatelessWidget {
         ),
       ),
       themeMode: ThemeMode.system,
-      home: HomeScreen(
-        repository: repository,
-        trackingService: trackingService,
-      ),
+      home: _isLoading
+          ? const Scaffold(body: Center(child: CircularProgressIndicator()))
+          : (!_hasCompletedOnboarding
+              ? FirstLaunchOnboardingScreen(
+                  onCompleted: _onOnboardingComplete,
+                )
+              : HomeScreen(
+                  repository: widget.repository,
+                  trackingService: widget.trackingService,
+                )),
     );
   }
 }
@@ -76,6 +117,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Journey? _activeJourney;
   List<Journey> _savedJourneys = [];
   bool _isLoading = true;
+  int _currentTabIndex = 0;
 
   @override
   void initState() {
@@ -92,6 +134,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
+    // Restore active session state in tracking service if one exists
+    await _trackingService.restoreActiveSession();
     final journeys = await _repo.getJourneys();
     final active = await _repo.getActiveJourney();
     if (mounted) {
@@ -106,7 +150,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _navigateToPlanner([Journey? journey]) async {
     final result = await Navigator.of(context).push<Journey>(
       MaterialPageRoute(
-        builder: (context) => JourneyPlannerScreen(
+        builder: (context) => JourneyWizardScreen(
           existingJourney: journey,
           repository: _repo,
         ),
@@ -143,6 +187,19 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _resumeActiveJourney() async {
+    await _trackingService.resumeTracking();
+    await _loadData();
+    if (mounted) {
+      _openLiveTracking();
+    }
+  }
+
+  Future<void> _pauseActiveJourney() async {
+    await _trackingService.pauseTracking();
+    await _loadData();
+  }
+
   Future<void> _cancelActiveJourney() async {
     await _trackingService.cancelTracking();
     await _loadData();
@@ -171,166 +228,319 @@ class _HomeScreenState extends State<HomeScreen> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
+    Widget bodyWidget;
+    switch (_currentTabIndex) {
+      case 1:
+        bodyWidget = SavedJourneysScreen(
+          repository: _repo,
+          onStartJourney: _startJourney,
+        );
+        break;
+      case 2:
+        bodyWidget = SafetyContactsScreen(
+          repository: _repo,
+        );
+        break;
+      case 3:
+        bodyWidget = SettingsScreen(
+          repository: _repo,
+        );
+        break;
+      case 0:
+      default:
+        bodyWidget = SafeArea(
+          child: _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : RefreshIndicator(
+                  onRefresh: _loadData,
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16.0,
+                      vertical: 20.0,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // Warm Greeting Header
+                        _buildGreetingHeader(theme, colorScheme),
+                        const SizedBox(height: 16),
+
+                        // Prominent Hero Card to Plan a Journey
+                        _buildHeroPlanCard(theme, colorScheme),
+                        const SizedBox(height: 20),
+
+                        // Active Journey Status Section (No "No active stop" bug!)
+                        _buildActiveJourneyCard(theme, colorScheme),
+                        const SizedBox(height: 20),
+
+                        // Quick Actions
+                        Row(
+                          children: [
+                            Expanded(
+                              child: FilledButton.tonalIcon(
+                                onPressed: () => _navigateToPlanner(),
+                                icon: const Icon(Icons.add_road),
+                                label: const Text('New Journey'),
+                                style: FilledButton.styleFrom(
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 14),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: () {
+                                  setState(() => _currentTabIndex = 1);
+                                },
+                                icon: const Icon(Icons.folder_open_outlined),
+                                label: Text('Saved (${_savedJourneys.length})'),
+                                style: OutlinedButton.styleFrom(
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 14),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 24),
+
+                        // Upcoming Stops Section
+                        _buildUpcomingStopsSection(theme, colorScheme),
+                        const SizedBox(height: 24),
+
+                        // Saved Journeys list if available
+                        if (_savedJourneys.isNotEmpty)
+                          _buildSavedJourneysSection(theme, colorScheme),
+                      ],
+                    ),
+                  ),
+                ),
+        );
+        break;
+    }
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'YatraSaathi',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        centerTitle: false,
-        backgroundColor: colorScheme.surfaceContainerHighest,
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.shield_outlined),
-            tooltip: 'Permissions Guide',
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => const PermissionGuidanceScreen(),
+      appBar: _currentTabIndex == 0
+          ? AppBar(
+              title: const Text(
+                'YatraSaathi',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              centerTitle: false,
+              backgroundColor: colorScheme.surfaceContainerHighest,
+              elevation: 0,
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.shield_outlined),
+                  tooltip: 'Permissions Guide',
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => const PermissionGuidanceScreen(),
+                      ),
+                    );
+                  },
                 ),
-              );
-            },
+                IconButton(
+                  icon: const Icon(Icons.lock_outline),
+                  tooltip: 'Privacy Info',
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => const PrivacyInfoScreen(),
+                      ),
+                    );
+                  },
+                ),
+                IconButton(
+                  icon: const Icon(Icons.settings_outlined),
+                  tooltip: 'Settings',
+                  onPressed: () {
+                    setState(() => _currentTabIndex = 3);
+                  },
+                ),
+              ],
+            )
+          : null,
+      body: bodyWidget,
+      floatingActionButton: _currentTabIndex == 0
+          ? FloatingActionButton.extended(
+              onPressed: () => _navigateToPlanner(),
+              icon: const Icon(Icons.add),
+              label: const Text('Plan Journey'),
+              tooltip: 'Create New Journey',
+            )
+          : null,
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _currentTabIndex,
+        onDestinationSelected: (index) {
+          setState(() => _currentTabIndex = index);
+          if (index == 0) _loadData();
+        },
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.home_outlined),
+            selectedIcon: Icon(Icons.home),
+            label: 'Home',
           ),
-          IconButton(
-            icon: const Icon(Icons.lock_outline),
-            tooltip: 'Privacy Info',
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => const PrivacyInfoScreen(),
-                ),
-              );
-            },
+          NavigationDestination(
+            icon: Icon(Icons.route_outlined),
+            selectedIcon: Icon(Icons.route),
+            label: 'Journeys',
           ),
-          IconButton(
-            icon: const Icon(Icons.settings_outlined),
-            tooltip: 'Settings',
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => SettingsScreen(repository: _repo),
-                ),
-              );
-            },
+          NavigationDestination(
+            icon: Icon(Icons.contacts_outlined),
+            selectedIcon: Icon(Icons.contacts),
+            label: 'Contacts',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.settings_outlined),
+            selectedIcon: Icon(Icons.settings),
+            label: 'Settings',
           ),
         ],
       ),
-      body: SafeArea(
-        child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : RefreshIndicator(
-                onRefresh: _loadData,
-                child: SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16.0,
-                    vertical: 20.0,
-                  ),
+    );
+  }
+
+  Widget _buildGreetingHeader(ThemeData theme, ColorScheme colorScheme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.directions_transit, color: colorScheme.primary, size: 26),
+            const SizedBox(width: 8),
+            Text(
+              'YatraSaathi Companion',
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Your journey. Your check-ins. Your peace of mind.',
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHeroPlanCard(ThemeData theme, ColorScheme colorScheme) {
+    return Card(
+      elevation: 2,
+      color: colorScheme.primaryContainer.withAlpha(90),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: BorderSide(color: colorScheme.primary.withAlpha(60)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor: colorScheme.primary,
+                  foregroundColor: colorScheme.onPrimary,
+                  child: const Icon(Icons.map_outlined),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Active Journey Status Section
-                      _buildActiveJourneyCard(theme, colorScheme),
-                      const SizedBox(height: 20),
-
-                      // Quick Actions
-                      Row(
-                        children: [
-                          Expanded(
-                            child: FilledButton.icon(
-                              onPressed: () => _navigateToPlanner(),
-                              icon: const Icon(Icons.add_road),
-                              label: const Text('Create Journey'),
-                              style: FilledButton.styleFrom(
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 14),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                textStyle: const TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: () {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (context) => SavedJourneysScreen(
-                                      repository: _repo,
-                                      onStartJourney: _startJourney,
-                                    ),
-                                  ),
-                                ).then((_) => _loadData());
-                              },
-                              icon: const Icon(Icons.folder_open_outlined),
-                              label: const Text('All Journeys'),
-                              style: OutlinedButton.styleFrom(
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 14),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                textStyle: const TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
+                      Text(
+                        'Where are you traveling today?',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                      const SizedBox(height: 24),
-
-                      // Upcoming Stops Section
-                      _buildUpcomingStopsSection(theme, colorScheme),
-                      const SizedBox(height: 24),
-
-                      // Saved Journeys list if available
-                      if (_savedJourneys.isNotEmpty)
-                        _buildSavedJourneysSection(theme, colorScheme),
+                      Text(
+                        'Search places or tap on interactive maps',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
                     ],
                   ),
                 ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              onPressed: () => _navigateToPlanner(),
+              icon: const Icon(Icons.add_location_alt_outlined),
+              label: const Text('Plan a Journey'),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(48),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _navigateToPlanner(),
-        icon: const Icon(Icons.add),
-        label: const Text('New Journey'),
-        tooltip: 'Create Journey',
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildActiveJourneyCard(ThemeData theme, ColorScheme colorScheme) {
     final active = _activeJourney;
-    final isActive = active != null && active.isActive;
-    final nextStop = active?.nextActiveStop;
+    final isRunning = active != null && (active.isActive || active.isPaused);
+    final isPaused = active?.isPaused ?? false;
+    final nextStop = active?.nextActiveStop ?? active?.nextStop;
+
+    final totalStops = active?.totalStops ?? 0;
+    final reachedStops = active?.stops.where((s) => s.isReached).length ?? 0;
+    final progress = totalStops > 0 ? (reachedStops / totalStops) : 0.0;
 
     return Card(
-      elevation: 0,
-      color: colorScheme.surfaceContainerLow,
+      elevation: isRunning ? 3 : 0,
+      color: isRunning
+          ? (isPaused
+              ? Colors.amber.shade50.withAlpha(50)
+              : colorScheme.surfaceContainerLow)
+          : colorScheme.surfaceContainerLow,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: colorScheme.outlineVariant.withAlpha(120)),
+        borderRadius: BorderRadius.circular(18),
+        side: BorderSide(
+          color: isRunning
+              ? (isPaused ? Colors.amber : Colors.green)
+              : colorScheme.outlineVariant.withAlpha(120),
+          width: isRunning ? 2.0 : 1.0,
+        ),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(18.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
                 Icon(
-                  Icons.navigation_outlined,
-                  color: isActive ? Colors.green : colorScheme.primary,
-                  size: 22,
+                  isRunning
+                      ? (isPaused
+                          ? Icons.pause_circle_outline
+                          : Icons.navigation_outlined)
+                      : Icons.explore_off_outlined,
+                  color: isRunning
+                      ? (isPaused ? Colors.amber.shade800 : Colors.green)
+                      : colorScheme.outline,
+                  size: 24,
                 ),
                 const SizedBox(width: 8),
                 Text(
@@ -346,34 +556,38 @@ class _HomeScreenState extends State<HomeScreen> {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: isActive
-                        ? Colors.green.withAlpha(40)
+                    color: isRunning
+                        ? (isPaused
+                            ? Colors.amber.withAlpha(40)
+                            : Colors.green.withAlpha(40))
                         : colorScheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
-                    isActive ? 'Active' : 'Inactive',
+                    isRunning ? (isPaused ? 'Paused' : 'Active') : 'Idle',
                     style: theme.textTheme.labelSmall?.copyWith(
-                      color: isActive
-                          ? Colors.green.shade800
+                      color: isRunning
+                          ? (isPaused
+                              ? Colors.amber.shade900
+                              : Colors.green.shade800)
                           : colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 12),
-            if (!isActive) ...[
+            if (!isRunning) ...[
               Text(
-                'No active journey in progress.',
+                'No journey currently being tracked.',
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: colorScheme.onSurfaceVariant,
                 ),
               ),
               const SizedBox(height: 4),
               Text(
-                'GPS arrival tracking is currently idle.',
+                'Plan a journey or select a saved route to start GPS monitoring.',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: colorScheme.outline,
                 ),
@@ -386,41 +600,120 @@ class _HomeScreenState extends State<HomeScreen> {
                   color: colorScheme.onSurface,
                 ),
               ),
-              const SizedBox(height: 4),
-              Text(
-                nextStop != null
-                    ? 'Target stop: ${nextStop.name} (Stop ${nextStop.order + 1}/${active.totalStops})'
-                    : 'All stops reached.',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: colorScheme.primary,
-                  fontWeight: FontWeight.w500,
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  const Icon(Icons.trip_origin, size: 14, color: Colors.grey),
+                  const SizedBox(width: 4),
+                  Text(
+                    active.startLocationName,
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                  const SizedBox(width: 6),
+                  const Icon(Icons.arrow_forward, size: 12, color: Colors.grey),
+                  const SizedBox(width: 6),
+                  const Icon(Icons.flag, size: 14, color: Colors.deepOrange),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      active.destinationName,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+
+              // Target Stop Callout
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: colorScheme.primaryContainer.withAlpha(60),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.pin_drop, color: colorScheme.primary, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'NEXT STOP',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.8,
+                              color: Colors.grey,
+                            ),
+                          ),
+                          Text(
+                            nextStop?.name ?? 'Locating stop...',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Text(
+                      '${totalStops - reachedStops} left',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
+
+              // Progress bar
+              ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: LinearProgressIndicator(
+                  value: progress,
+                  minHeight: 6,
+                  color: Colors.green,
+                  backgroundColor: colorScheme.surfaceContainerHighest,
                 ),
               ),
               const SizedBox(height: 14),
+
+              // Action buttons
               Row(
                 children: [
                   Expanded(
-                    child: FilledButton.tonalIcon(
+                    child: FilledButton.icon(
                       onPressed: _openLiveTracking,
                       icon: const Icon(Icons.radar, size: 18),
                       label: const Text('Live Tracking'),
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  OutlinedButton.icon(
+                  const SizedBox(width: 8),
+                  if (isPaused)
+                    IconButton.filledTonal(
+                      onPressed: _resumeActiveJourney,
+                      icon: const Icon(Icons.play_arrow),
+                      tooltip: 'Resume Tracking',
+                    )
+                  else
+                    IconButton.filledTonal(
+                      onPressed: _pauseActiveJourney,
+                      icon: const Icon(Icons.pause),
+                      tooltip: 'Pause Tracking',
+                    ),
+                  const SizedBox(width: 8),
+                  IconButton.outlined(
                     onPressed: _cancelActiveJourney,
-                    icon: const Icon(
-                      Icons.stop_circle_outlined,
-                      color: Colors.red,
-                      size: 18,
-                    ),
-                    label: const Text(
-                      'Cancel',
-                      style: TextStyle(color: Colors.red),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Colors.red),
-                    ),
+                    icon: const Icon(Icons.stop_circle_outlined, color: Colors.red),
+                    tooltip: 'Cancel Journey',
                   ),
                 ],
               ),
@@ -433,120 +726,111 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildUpcomingStopsSection(ThemeData theme, ColorScheme colorScheme) {
     final active = _activeJourney;
-    final stops = active?.remainingStops ?? <dynamic>[];
+    final stops = active?.stops ?? [];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Icon(Icons.place_outlined, size: 20, color: colorScheme.primary),
-            const SizedBox(width: 8),
             Text(
-              'Upcoming Stops',
+              'Journey Stops',
               style: theme.textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
             ),
+            if (stops.isNotEmpty)
+              Text(
+                '${stops.length} configured',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
           ],
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
         if (stops.isEmpty)
           Card(
             elevation: 0,
             color: colorScheme.surfaceContainerLow,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
-              side: BorderSide(color: colorScheme.outlineVariant.withAlpha(120)),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 20.0,
-                vertical: 36.0,
+              side: BorderSide(
+                color: colorScheme.outlineVariant.withAlpha(120),
               ),
+            ),
+            child: const Padding(
+              padding: EdgeInsets.symmetric(vertical: 24.0, horizontal: 16.0),
               child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    CircleAvatar(
-                      radius: 32,
-                      backgroundColor: colorScheme.primaryContainer,
-                      child: Icon(
-                        Icons.map_outlined,
-                        size: 32,
-                        color: colorScheme.onPrimaryContainer,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'No Stops Planned',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Plan a journey with multi-stop arrival alarms and automatic check-in messages.',
-                      textAlign: TextAlign.center,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
+                child: Text('No upcoming stops configured.'),
               ),
             ),
           )
         else
-          ListView.builder(
+          ListView.separated(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: stops.length,
+            separatorBuilder: (_, _) => const SizedBox(height: 6),
             itemBuilder: (context, index) {
               final stop = stops[index];
-              final isCurrent = index == 0;
+              final isReached = stop.isReached;
+              final isCurrent = active?.nextStop?.id == stop.id;
 
               return Card(
-                key: ValueKey(stop.id),
-                margin: const EdgeInsets.only(bottom: 8),
+                elevation: isCurrent ? 2 : 0,
+                color: isCurrent
+                    ? colorScheme.primaryContainer.withAlpha(40)
+                    : colorScheme.surfaceContainerLow,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                   side: BorderSide(
-                    color: isCurrent
-                        ? colorScheme.primary
-                        : colorScheme.outlineVariant.withAlpha(80),
-                    width: isCurrent ? 1.5 : 1.0,
+                    color: isCurrent ? colorScheme.primary : Colors.transparent,
                   ),
                 ),
                 child: ListTile(
+                  dense: true,
                   leading: CircleAvatar(
-                    backgroundColor: isCurrent
-                        ? colorScheme.primary
-                        : colorScheme.surfaceContainerHighest,
-                    foregroundColor: isCurrent
-                        ? colorScheme.onPrimary
-                        : colorScheme.onSurface,
-                    child: Text('${stop.order + 1}'),
+                    radius: 14,
+                    backgroundColor: isReached
+                        ? Colors.green
+                        : (isCurrent
+                            ? colorScheme.primary
+                            : colorScheme.surfaceContainerHighest),
+                    foregroundColor: isReached || isCurrent
+                        ? Colors.white
+                        : colorScheme.onSurfaceVariant,
+                    child: isReached
+                        ? const Icon(Icons.check, size: 14)
+                        : Text(
+                            '${index + 1}',
+                            style: const TextStyle(fontSize: 11),
+                          ),
                   ),
                   title: Text(
                     stop.name,
                     style: TextStyle(
                       fontWeight: isCurrent ? FontWeight.bold : FontWeight.w500,
+                      decoration: isReached ? TextDecoration.lineThrough : null,
                     ),
                   ),
                   subtitle: Text(
-                    'Radius: ${stop.radiusMeters.toStringAsFixed(0)}m ${stop.isFinalDestination ? "• Final Destination" : ""}',
+                    'Alert: ${stop.radiusMeters.toStringAsFixed(0)}m radius',
+                    style: const TextStyle(fontSize: 11),
                   ),
                   trailing: isCurrent
-                      ? Chip(
-                          label: const Text('Target'),
-                          labelStyle: TextStyle(
-                            fontSize: 11,
-                            color: colorScheme.primary,
-                            fontWeight: FontWeight.bold,
+                      ? const Chip(
+                          label: Text(
+                            'TARGET',
+                            style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.green,
+                            ),
                           ),
-                          backgroundColor: colorScheme.primaryContainer,
                           padding: EdgeInsets.zero,
+                          visualDensity: VisualDensity.compact,
                         )
                       : null,
                 ),
@@ -562,16 +846,14 @@ class _HomeScreenState extends State<HomeScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Icon(Icons.route_outlined, size: 20, color: colorScheme.primary),
-            const SizedBox(width: 8),
             Text(
-              'Saved Journeys (${_savedJourneys.length})',
+              'Saved Journeys',
               style: theme.textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
             ),
-            const Spacer(),
             TextButton(
               onPressed: () {
                 Navigator.of(context).push(
@@ -587,35 +869,32 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ],
         ),
-        const SizedBox(height: 8),
-        ListView.builder(
+        const SizedBox(height: 4),
+        ListView.separated(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          itemCount: _savedJourneys.length > 3 ? 3 : _savedJourneys.length,
+          itemCount: _savedJourneys.take(3).length,
+          separatorBuilder: (_, _) => const SizedBox(height: 6),
           itemBuilder: (context, index) {
-            final j = _savedJourneys[index];
-            final isThisActive = j.id == _activeJourney?.id && j.isActive;
-
+            final journey = _savedJourneys[index];
             return Card(
-              margin: const EdgeInsets.only(bottom: 8),
+              elevation: 0,
+              color: colorScheme.surfaceContainerLow,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
               child: ListTile(
+                leading: const Icon(Icons.route_outlined),
                 title: Text(
-                  j.name,
+                  journey.name,
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
-                subtitle: Text(
-                  '${j.totalStops} stops • Status: ${j.status.name}',
+                subtitle: Text('${journey.totalStops} stops configured'),
+                trailing: FilledButton.tonal(
+                  onPressed: () => _startJourney(journey),
+                  child: const Text('Start'),
                 ),
-                trailing: isThisActive
-                    ? const Chip(
-                        label: Text('Active'),
-                        backgroundColor: Colors.greenAccent,
-                      )
-                    : TextButton(
-                        onPressed: () => _startJourney(j),
-                        child: const Text('Start'),
-                      ),
-                onTap: () => _navigateToPlanner(j),
+                onTap: () => _navigateToPlanner(journey),
               ),
             );
           },

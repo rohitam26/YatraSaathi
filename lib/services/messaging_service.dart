@@ -1,14 +1,27 @@
 import 'package:flutter/foundation.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'direct_sms_service.dart';
 
 /// Honest delivery status of an arrival check-in message.
 enum MessageDeliveryStatus {
   notTriggered,
+  pending,
   readyToSend,
   composerOpened,
   sentConfirmed,
   failed,
   userCancelled,
+}
+
+/// Operational messaging mode for safety check-ins.
+enum MessagingMode {
+  /// Launches native Android SMS composer pre-filled with recipient and message.
+  /// 100% compliant with Google Play Store policies (no restricted permissions).
+  composer,
+
+  /// Directly sends SMS in background via Android SmsManager.
+  /// Intended exclusively for privately distributed APK builds with explicit user consent.
+  directSms,
 }
 
 /// Abstract contract for dispatching arrival check-in messages.
@@ -19,6 +32,7 @@ abstract class MessagingService {
     required String stopName,
     required String customMessage,
     String? journeyName,
+    bool sendDirect = false,
   });
 
   String formatDefaultMessage({
@@ -29,14 +43,15 @@ abstract class MessagingService {
   String maskPhoneNumber(String rawPhone);
 }
 
-/// Compliant Android implementation of [MessagingService] that launches
-/// the native Android SMS Composer pre-populated with recipient and text.
-///
-/// Complies fully with Google Play SMS Permissions Policy (avoids dangerous
-/// `SEND_SMS` permission). Honors user privacy and never falsely claims
-/// `sentConfirmed` when only `composerOpened` was achieved.
+/// Comprehensive Android implementation of [MessagingService] supporting both:
+/// 1. Native SMS Composer (Default, zero restricted permissions, compliant fallback).
+/// 2. Direct Background SMS via [DirectSmsService] (for opted-in contacts when consent is granted).
 class CompliantSmsMessagingService implements MessagingService {
-  const CompliantSmsMessagingService();
+  const CompliantSmsMessagingService({
+    this.directSmsService = const DirectSmsService(),
+  });
+
+  final DirectSmsService directSmsService;
 
   @override
   String formatDefaultMessage({
@@ -64,10 +79,11 @@ class CompliantSmsMessagingService implements MessagingService {
     required String stopName,
     required String customMessage,
     String? journeyName,
+    bool sendDirect = false,
   }) async {
-    final trimmedPhone = phoneNumber.replaceAll(RegExp(r'\s+'), '');
-    if (trimmedPhone.isEmpty) {
-      debugPrint('[MessagingService] Cannot send SMS: Empty phone number.');
+    final trimmedPhone = phoneNumber.replaceAll(RegExp(r'[\s\-\(\)]'), '').trim();
+    if (trimmedPhone.isEmpty || trimmedPhone.length < 5) {
+      debugPrint('[MessagingService] Cannot send SMS: Invalid or empty phone number "$trimmedPhone".');
       return MessageDeliveryStatus.failed;
     }
 
@@ -75,14 +91,36 @@ class CompliantSmsMessagingService implements MessagingService {
         ? customMessage.trim()
         : formatDefaultMessage(stopName: stopName);
 
-    // Sanitize and mask in logs to prevent PII exposure
+    // If Direct SMS is explicitly requested for this contact, attempt direct transmission
+    if (sendDirect) {
+      debugPrint(
+        '[MessagingService] Attempting Direct SMS dispatch to "$contactName" (${maskPhoneNumber(trimmedPhone)}) for stop "$stopName".',
+      );
+
+      final directResult = await directSmsService.sendDirectSms(
+        phoneNumber: trimmedPhone,
+        message: messageText,
+      );
+
+      if (directResult.isSuccess) {
+        debugPrint(
+          '[MessagingService] Direct SMS transmitted confirmed by Android radio: ${directResult.message}',
+        );
+        return MessageDeliveryStatus.sentConfirmed;
+      }
+
+      debugPrint(
+        '[MessagingService] Direct SMS failed (${directResult.errorCode}: ${directResult.message}). Falling back to Native SMS Composer.',
+      );
+      // Fallback to Native Composer so the user is never stranded
+    }
+
+    // Default & Fallback: Launch native Android SMS Composer
     debugPrint(
-      '[MessagingService] Opening SMS composer for contact "$contactName" (${maskPhoneNumber(trimmedPhone)}) for stop "$stopName".',
+      '[MessagingService] Opening native SMS composer for contact "$contactName" (${maskPhoneNumber(trimmedPhone)}) for stop "$stopName".',
     );
 
     try {
-      // Build compliant sms: URI scheme
-      // Android SMS URI standard: sms:<phone>?body=<encodedText>
       final uri = Uri(
         scheme: 'sms',
         path: trimmedPhone,
@@ -95,32 +133,25 @@ class CompliantSmsMessagingService implements MessagingService {
           mode: LaunchMode.externalApplication,
         );
         if (launched) {
-          // Honest status: Composer is opened; Android OS leaves final send confirmation to the user
-          debugPrint(
-            '[MessagingService] Native SMS composer opened successfully.',
-          );
-          return MessageDeliveryStatus.composerOpened;
-        } else {
-          debugPrint('[MessagingService] Failed to launch SMS composer URL.');
-          return MessageDeliveryStatus.failed;
-        }
-      } else {
-        // Fallback: try raw query string if parameter encoding was rejected
-        final fallbackUri = Uri.parse(
-          'sms:$trimmedPhone?body=${Uri.encodeComponent(messageText)}',
-        );
-        if (await canLaunchUrl(fallbackUri)) {
-          await launchUrl(fallbackUri, mode: LaunchMode.externalApplication);
+          debugPrint('[MessagingService] Native SMS composer opened successfully.');
           return MessageDeliveryStatus.composerOpened;
         }
-
-        debugPrint('[MessagingService] Device cannot launch SMS uri: $uri');
-        return MessageDeliveryStatus.failed;
       }
+
+      // Fallback URI parsing for stubborn intent filters
+      final fallbackUri = Uri.parse(
+        'sms:$trimmedPhone?body=${Uri.encodeComponent(messageText)}',
+      );
+      if (await canLaunchUrl(fallbackUri)) {
+        await launchUrl(fallbackUri, mode: LaunchMode.externalApplication);
+        return MessageDeliveryStatus.composerOpened;
+      }
+
+      debugPrint('[MessagingService] Device cannot launch SMS uri: $uri');
+      return MessageDeliveryStatus.failed;
     } catch (e, stack) {
       debugPrint('[MessagingService] Exception launching SMS composer: $e\n$stack');
       return MessageDeliveryStatus.failed;
     }
   }
 }
-
