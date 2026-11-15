@@ -7,6 +7,8 @@ class AlarmConfig {
     this.soundEnabled = true,
     this.soundName = 'Default Chime',
     this.vibrationEnabled = true,
+    this.volume = 1.0,
+    this.repeatUntilDismissed = true,
     this.snoozeDurationMinutes = 5,
     this.repeatIntervalSeconds = 30,
     this.maxRepeats = 3,
@@ -15,7 +17,8 @@ class AlarmConfig {
     this.snoozedUntil,
   }) : assert(snoozeDurationMinutes > 0, 'Snooze duration must be positive'),
        assert(repeatIntervalSeconds > 0, 'Repeat interval must be positive'),
-       assert(maxRepeats >= 0, 'Max repeats cannot be negative');
+       assert(maxRepeats >= 0, 'Max repeats cannot be negative'),
+       assert(volume >= 0.0 && volume <= 1.0, 'Volume must be between 0.0 and 1.0');
 
   /// Creates a standard default alarm configuration.
   factory AlarmConfig.standard() => const AlarmConfig();
@@ -23,6 +26,8 @@ class AlarmConfig {
   final bool soundEnabled;
   final String soundName;
   final bool vibrationEnabled;
+  final double volume;
+  final bool repeatUntilDismissed;
   final int snoozeDurationMinutes;
   final int repeatIntervalSeconds;
   final int maxRepeats;
@@ -34,6 +39,8 @@ class AlarmConfig {
     bool? soundEnabled,
     String? soundName,
     bool? vibrationEnabled,
+    double? volume,
+    bool? repeatUntilDismissed,
     int? snoozeDurationMinutes,
     int? repeatIntervalSeconds,
     int? maxRepeats,
@@ -45,6 +52,8 @@ class AlarmConfig {
       soundEnabled: soundEnabled ?? this.soundEnabled,
       soundName: soundName ?? this.soundName,
       vibrationEnabled: vibrationEnabled ?? this.vibrationEnabled,
+      volume: volume ?? this.volume,
+      repeatUntilDismissed: repeatUntilDismissed ?? this.repeatUntilDismissed,
       snoozeDurationMinutes:
           snoozeDurationMinutes ?? this.snoozeDurationMinutes,
       repeatIntervalSeconds:
@@ -61,6 +70,8 @@ class AlarmConfig {
       'soundEnabled': soundEnabled,
       'soundName': soundName,
       'vibrationEnabled': vibrationEnabled,
+      'volume': volume,
+      'repeatUntilDismissed': repeatUntilDismissed,
       'snoozeDurationMinutes': snoozeDurationMinutes,
       'repeatIntervalSeconds': repeatIntervalSeconds,
       'maxRepeats': maxRepeats,
@@ -75,6 +86,8 @@ class AlarmConfig {
       soundEnabled: json['soundEnabled'] as bool? ?? true,
       soundName: json['soundName'] as String? ?? 'Default Chime',
       vibrationEnabled: json['vibrationEnabled'] as bool? ?? true,
+      volume: (json['volume'] as num?)?.toDouble() ?? 1.0,
+      repeatUntilDismissed: json['repeatUntilDismissed'] as bool? ?? true,
       snoozeDurationMinutes: json['snoozeDurationMinutes'] as int? ?? 5,
       repeatIntervalSeconds: json['repeatIntervalSeconds'] as int? ?? 30,
       maxRepeats: json['maxRepeats'] as int? ?? 3,
@@ -94,6 +107,8 @@ class AlarmConfig {
           soundEnabled == other.soundEnabled &&
           soundName == other.soundName &&
           vibrationEnabled == other.vibrationEnabled &&
+          volume == other.volume &&
+          repeatUntilDismissed == other.repeatUntilDismissed &&
           snoozeDurationMinutes == other.snoozeDurationMinutes &&
           repeatIntervalSeconds == other.repeatIntervalSeconds &&
           maxRepeats == other.maxRepeats &&
@@ -106,6 +121,8 @@ class AlarmConfig {
     soundEnabled,
     soundName,
     vibrationEnabled,
+    volume,
+    repeatUntilDismissed,
     snoozeDurationMinutes,
     repeatIntervalSeconds,
     maxRepeats,
