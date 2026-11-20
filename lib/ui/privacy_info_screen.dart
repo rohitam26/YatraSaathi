@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// Screen explaining YatraSaathi's 100% local-first privacy architecture,
+/// Screen explaining STOP Vanthachu's 100% local-first privacy architecture,
 /// data retention policy, and transparent SMS messaging handling.
 class PrivacyInfoScreen extends StatelessWidget {
   const PrivacyInfoScreen({super.key});
@@ -47,7 +47,7 @@ class PrivacyInfoScreen extends StatelessWidget {
             icon: Icons.cloud_off_outlined,
             title: 'Zero Remote Cloud Storage',
             body:
-                'YatraSaathi requires no user account, email login, or external server. All saved journeys, stop coordinates, and alarm preferences are serialized exclusively in private application storage on your phone.',
+                'STOP Vanthachu requires no user account, email login, or external server. All saved journeys, stop coordinates, and alarm preferences are serialized exclusively in private application storage on your phone.',
           ),
           _buildSection(
             theme: theme,
@@ -61,7 +61,7 @@ class PrivacyInfoScreen extends StatelessWidget {
             icon: Icons.sms_outlined,
             title: 'Transparent Android SMS Compliance',
             body:
-                'In strict compliance with Google Play Developer policies, YatraSaathi never attempts to silently send background SMS messages without your knowledge. When arrival check-in is triggered, the native Android SMS composer opens with your preconfigured message, leaving final delivery confirmation in your control.',
+                'In strict compliance with Google Play Developer policies, STOP Vanthachu never attempts to silently send background SMS messages without your knowledge. When arrival check-in is triggered, the native Android SMS composer opens with your preconfigured message, leaving final delivery confirmation in your control.',
           ),
           _buildSection(
             theme: theme,

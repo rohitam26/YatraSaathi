@@ -6,6 +6,7 @@ import '../models/stop.dart';
 import '../models/user_profile.dart';
 import '../services/alarm_service.dart';
 import '../services/geocoding_service.dart';
+import '../services/phone_number_helper.dart';
 import 'widgets/map_location_picker.dart';
 
 /// Redesigned consumer-friendly modal for adding or editing a stop.
@@ -78,6 +79,7 @@ class _StopConfigDialogState extends State<StopConfigDialog>
   late bool _vibrationEnabled;
   late int _repeatCount;
   late int _snoozeMinutes;
+  late bool _gradualVolumeRampUp;
 
   // Contact fields
   late bool _checkInEnabled;
@@ -108,6 +110,7 @@ class _StopConfigDialogState extends State<StopConfigDialog>
     _vibrationEnabled = alarm.vibrationEnabled;
     _repeatCount = alarm.maxRepeats;
     _snoozeMinutes = alarm.snoozeDurationMinutes;
+    _gradualVolumeRampUp = alarm.gradualVolumeRampUp;
 
     final checkIn = (stop?.contacts.isNotEmpty ?? false)
         ? stop!.contacts.first
@@ -131,7 +134,7 @@ class _StopConfigDialogState extends State<StopConfigDialog>
       _contactNameController = TextEditingController();
       _contactPhoneController = TextEditingController();
       _messageController = TextEditingController(
-        text: 'Hi! I have safely reached my stop. - Sent via YatraSaathi',
+        text: 'Hi! I have safely reached my stop. - Sent via STOP Vanthachu',
       );
     }
   }
@@ -221,17 +224,19 @@ class _StopConfigDialogState extends State<StopConfigDialog>
       vibrationEnabled: _vibrationEnabled,
       maxRepeats: _repeatCount,
       snoozeDurationMinutes: _snoozeMinutes,
+      gradualVolumeRampUp: _gradualVolumeRampUp,
     );
 
     final contacts = <ContactCheckInConfig>[];
     if (_checkInEnabled && _contactPhoneController.text.trim().isNotEmpty) {
+      final normalized = PhoneNumberHelper.normalizeToE164(_contactPhoneController.text.trim());
       contacts.add(
         ContactCheckInConfig(
           id: 'contact_${DateTime.now().millisecondsSinceEpoch}',
           contactName: _contactNameController.text.trim().isNotEmpty
               ? _contactNameController.text.trim()
               : 'Emergency Contact',
-          phoneNumber: _contactPhoneController.text.trim(),
+          phoneNumber: normalized,
           customMessage: _messageController.text.trim(),
         ),
       );
@@ -567,7 +572,7 @@ class _StopConfigDialogState extends State<StopConfigDialog>
           ),
           const SizedBox(height: 4),
           Text(
-            'How far before the stop should YatraSaathi alert you?',
+            'How far before the stop should STOP Vanthachu alert you?',
             style: theme.textTheme.bodySmall?.copyWith(
               color: colorScheme.onSurfaceVariant,
             ),
@@ -641,6 +646,13 @@ class _StopConfigDialogState extends State<StopConfigDialog>
             subtitle: const Text('Vibrate phone upon arrival'),
             value: _vibrationEnabled,
             onChanged: (val) => setState(() => _vibrationEnabled = val),
+          ),
+          const Divider(height: 24),
+          SwitchListTile(
+            title: const Text('Gentle Wake-Up (Volume Ramp-Up)'),
+            subtitle: const Text('Gradually escalates alarm volume and vibration to avoid startling'),
+            value: _gradualVolumeRampUp,
+            onChanged: (val) => setState(() => _gradualVolumeRampUp = val),
           ),
           const Divider(height: 24),
           Row(
@@ -794,9 +806,8 @@ class _StopConfigDialogState extends State<StopConfigDialog>
                 if (v == null || v.trim().isEmpty) {
                   return 'Please enter a contact phone number';
                 }
-                final digits = v.replaceAll(RegExp(r'\D'), '');
-                if (digits.length < 7) {
-                  return 'Please enter a valid phone number';
+                if (!PhoneNumberHelper.isValidFormat(v)) {
+                  return 'Please enter a valid mobile number (e.g. 9876543210)';
                 }
                 return null;
               },
@@ -845,7 +856,7 @@ class _StopConfigDialogState extends State<StopConfigDialog>
                     Text(
                       _messageController.text.trim().isNotEmpty
                           ? _messageController.text.trim()
-                          : 'Hi! I have safely reached ${_nameController.text.trim().isNotEmpty ? _nameController.text.trim() : "my stop"}. - Sent via YatraSaathi',
+                          : 'Hi! I have safely reached ${_nameController.text.trim().isNotEmpty ? _nameController.text.trim() : "my stop"}. - Sent via STOP Vanthachu',
                       style: theme.textTheme.bodySmall?.copyWith(
                         fontStyle: FontStyle.italic,
                       ),

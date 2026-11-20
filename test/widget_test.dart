@@ -10,15 +10,16 @@ void main() {
     });
   });
 
-  testWidgets('YatraSaathi home screen displays key sections and navigates to planner', (
+  testWidgets('STOP Vanthachu home screen displays key sections and navigates to planner', (
     WidgetTester tester,
   ) async {
     // Build our app and trigger a frame.
     await tester.pumpWidget(const YatraSaathiApp());
     await tester.pumpAndSettle();
 
-    // Verify AppBar title.
-    expect(find.text('YatraSaathi'), findsOneWidget);
+    // Verify AppBar title and dashboard header.
+    expect(find.widgetWithText(AppBar, 'STOP Vanthachu'), findsOneWidget);
+    expect(find.text('STOP Vanthachu'), findsNWidgets(2));
 
     // Verify Active Journey status card.
     expect(find.text('Active Journey'), findsOneWidget);

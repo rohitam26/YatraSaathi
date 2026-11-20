@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import '../data/station_database.dart';
 
 /// Represents a geographic place found via geocoding search or reverse geocoding.
 class GeocodedPlace {
@@ -36,7 +37,7 @@ class GeocodingService {
   // Rate limiting timestamp (Nominatim requires max 1 req/sec)
   static DateTime _lastNominatimRequestTime = DateTime.fromMillisecondsSinceEpoch(0);
 
-  static const String _userAgent = 'YatraSaathi-App/1.0 (info@yatrasaathi.app)';
+  static const String _userAgent = 'STOPVanthachu-App/1.0 (info@stopvanthachu.app)';
 
   /// Categorizes a place based on OSM tags and query name.
   static String categorizePlace({
@@ -152,9 +153,21 @@ class GeocodingService {
 
     // 2. Fallback to OpenStreetMap Nominatim
     try {
-      return await _searchWithNominatim(cleanQuery);
+      final nominatimResults = await _searchWithNominatim(cleanQuery);
+      if (nominatimResults.isNotEmpty) {
+        return nominatimResults;
+      }
     } catch (e) {
       debugPrint('[GeocodingService] Nominatim fallback notice: $e');
+    }
+
+    // 3. Offline fallback to local transit station database
+    final offlineMatches = LocalStationDatabase.search(cleanQuery);
+    if (offlineMatches.isNotEmpty) {
+      debugPrint(
+        '[GeocodingService] Offline database matched ${offlineMatches.length} stations for "$cleanQuery"',
+      );
+      return offlineMatches;
     }
 
     return [];
@@ -338,7 +351,12 @@ class GeocodingService {
       debugPrint('[GeocodingService] Reverse geocode error: $e');
     }
 
-    // Graceful offline fallback
+    // Graceful offline fallback: check curated station database first
+    final nearestStation = LocalStationDatabase.findNearest(lat, lon);
+    if (nearestStation != null) {
+      return nearestStation;
+    }
+
     return GeocodedPlace(
       name: 'Location (${lat.toStringAsFixed(4)}, ${lon.toStringAsFixed(4)})',
       address: 'Coordinates: ${lat.toStringAsFixed(6)}, ${lon.toStringAsFixed(6)}',

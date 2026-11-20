@@ -1,5 +1,5 @@
 {
-  "model_name": "YatraSaathi_ArrivalConfidence_LogReg",
+  "model_name": "STOPVanthachu_ArrivalConfidence_LogReg",
   "version": "1.0.0",
   "trained_date": "2026-11-09",
   "dataset_type": "Synthetic Transit Telemetry (Experimental)",

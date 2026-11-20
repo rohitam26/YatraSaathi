@@ -45,15 +45,15 @@ void main() {
 
     // Verify Title & Tagline
     expect(find.text('Setup & Permissions'), findsOneWidget);
-    expect(find.text('Welcome to YatraSaathi'), findsOneWidget);
+    expect(find.text('Welcome to STOP Vanthachu'), findsOneWidget);
     expect(
-      find.text('Your journey. Your check-ins. Your peace of mind.'),
+      find.text('Never Miss Your Stop. Travel with Confidence.'),
       findsOneWidget,
     );
 
     // Verify Purpose explanation
     expect(
-      find.textContaining('YatraSaathi uses your location to detect when you reach your journey stops'),
+      find.textContaining('STOP Vanthachu uses your location to detect when you reach your journey stops'),
       findsOneWidget,
     );
 

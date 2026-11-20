@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../services/phone_number_helper.dart';
 
 /// Represents a trusted emergency contact configured for safety check-ins.
 @immutable
@@ -35,6 +36,14 @@ class SafetyContact {
       return '$cleanCc $cleanPhone';
     }
     return cleanPhone;
+  }
+
+  /// WhatsApp normalized number (digits only for wa.me).
+  String get waMePhoneNumber {
+    return PhoneNumberHelper.normalizeForWaMe(
+      phoneNumber,
+      defaultCountryCode: countryCode,
+    );
   }
 
   /// Privacy-safe masked phone for UI and audit logging.

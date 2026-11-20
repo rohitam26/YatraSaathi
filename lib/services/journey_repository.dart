@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../models/commute_schedule.dart';
 import '../models/journey.dart';
 import '../models/safety_contact.dart';
 import '../models/user_profile.dart';
@@ -18,6 +19,10 @@ abstract class JourneyRepository {
   Future<void> saveSafetyContact(SafetyContact contact);
   Future<void> deleteSafetyContact(String id);
   Future<void> setPrimaryContact(String id);
+  Future<List<CommuteSchedule>> getCommuteSchedules();
+  Future<CommuteSchedule?> getCommuteSchedule(String id);
+  Future<void> saveCommuteSchedule(CommuteSchedule schedule);
+  Future<void> deleteCommuteSchedule(String id);
   Future<void> clearAll();
 }
 
@@ -33,6 +38,7 @@ class LocalJourneyRepository implements JourneyRepository {
   static const String _activeJourneyIdKey = 'yatrasaathi_active_journey_id_v1';
   static const String _userProfileKey = 'yatrasaathi_user_profile_v1';
   static const String _safetyContactsKey = 'yatrasaathi_safety_contacts_v1';
+  static const String _commuteSchedulesKey = 'yatrasaathi_commute_schedules_v1';
 
   Future<SharedPreferences> get _prefs async =>
       _preferencesOverride ?? await SharedPreferences.getInstance();
@@ -81,8 +87,8 @@ class LocalJourneyRepository implements JourneyRepository {
     final jsonList = journeys.map((j) => jsonEncode(j.toJson())).toList();
     await prefs.setStringList(_journeysKey, jsonList);
 
-    // If journey status became active, track it as active
-    if (journey.isActive) {
+    // If journey status became active or paused, track it as active session
+    if (journey.isActive || journey.isPaused) {
       await prefs.setString(_activeJourneyIdKey, journey.id);
     } else {
       final currentActiveId = prefs.getString(_activeJourneyIdKey);
@@ -112,10 +118,10 @@ class LocalJourneyRepository implements JourneyRepository {
     final prefs = await _prefs;
     final activeId = prefs.getString(_activeJourneyIdKey);
     if (activeId == null) {
-      // Fallback: search for any journey currently marked active
+      // Fallback: search for any journey currently marked active or paused
       final journeys = await getJourneys();
       for (final j in journeys) {
-        if (j.isActive) {
+        if (j.isActive || j.isPaused) {
           await prefs.setString(_activeJourneyIdKey, j.id);
           return j;
         }
@@ -150,7 +156,7 @@ class LocalJourneyRepository implements JourneyRepository {
           defaultContactPhone: phone,
           defaultMessage: msg.isNotEmpty
               ? msg
-              : 'Hi! I have safely reached my stop. - Sent via YatraSaathi',
+              : 'Hi! I have safely reached my stop. - Sent via STOP Vanthachu',
         );
       }
       return const UserProfile();
@@ -268,11 +274,66 @@ class LocalJourneyRepository implements JourneyRepository {
   }
 
   @override
+  Future<List<CommuteSchedule>> getCommuteSchedules() async {
+    final prefs = await _prefs;
+    final jsonStrings = prefs.getStringList(_commuteSchedulesKey) ?? <String>[];
+    final schedules = <CommuteSchedule>[];
+
+    for (final jsonStr in jsonStrings) {
+      try {
+        final map = jsonDecode(jsonStr) as Map<String, dynamic>;
+        schedules.add(CommuteSchedule.fromJson(map));
+      } catch (_) {
+        // Skip malformed entries
+      }
+    }
+
+    schedules.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    return schedules;
+  }
+
+  @override
+  Future<CommuteSchedule?> getCommuteSchedule(String id) async {
+    final schedules = await getCommuteSchedules();
+    for (final s in schedules) {
+      if (s.id == id) return s;
+    }
+    return null;
+  }
+
+  @override
+  Future<void> saveCommuteSchedule(CommuteSchedule schedule) async {
+    final prefs = await _prefs;
+    final schedules = await getCommuteSchedules();
+
+    final index = schedules.indexWhere((s) => s.id == schedule.id);
+    if (index >= 0) {
+      schedules[index] = schedule;
+    } else {
+      schedules.add(schedule);
+    }
+
+    final jsonList = schedules.map((s) => jsonEncode(s.toJson())).toList();
+    await prefs.setStringList(_commuteSchedulesKey, jsonList);
+  }
+
+  @override
+  Future<void> deleteCommuteSchedule(String id) async {
+    final prefs = await _prefs;
+    final schedules = await getCommuteSchedules();
+    schedules.removeWhere((s) => s.id == id);
+
+    final jsonList = schedules.map((s) => jsonEncode(s.toJson())).toList();
+    await prefs.setStringList(_commuteSchedulesKey, jsonList);
+  }
+
+  @override
   Future<void> clearAll() async {
     final prefs = await _prefs;
     await prefs.remove(_journeysKey);
     await prefs.remove(_activeJourneyIdKey);
     await prefs.remove(_userProfileKey);
     await prefs.remove(_safetyContactsKey);
+    await prefs.remove(_commuteSchedulesKey);
   }
 }

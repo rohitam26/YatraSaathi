@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../models/safety_contact.dart';
 import '../services/journey_repository.dart';
+import '../services/messaging_service.dart';
+import '../services/phone_number_helper.dart';
 
 /// Screen providing comprehensive management for trusted safety contacts.
 ///
@@ -150,15 +152,19 @@ class _SafetyContactsScreenState extends State<SafetyContactsScreen> {
                                 if (val == null || val.trim().isEmpty) {
                                   return 'Enter phone number';
                                 }
-                                final digits = val.replaceAll(RegExp(r'\D'), '');
-                                if (digits.length < 7) {
-                                  return 'Enter a valid number';
+                                if (!PhoneNumberHelper.isValidFormat(val, defaultCountryCode: countryCode)) {
+                                  return 'Enter a valid number (e.g. 9876543210)';
                                 }
                                 return null;
                               },
                             ),
                           ),
                         ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Supports Indian & international numbers. WhatsApp account verification occurs in WhatsApp.',
+                        style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
                       ),
                       const SizedBox(height: 8),
                       SwitchListTile(
@@ -182,11 +188,15 @@ class _SafetyContactsScreenState extends State<SafetyContactsScreen> {
                 FilledButton(
                   onPressed: () {
                     if (formKey.currentState?.validate() == true) {
+                      final normalized = PhoneNumberHelper.normalizeToE164(
+                        phoneCtrl.text.trim(),
+                        defaultCountryCode: countryCode,
+                      );
                       final contact = SafetyContact(
                         id: existing?.id ??
                             'contact_${DateTime.now().millisecondsSinceEpoch}',
                         name: nameCtrl.text.trim(),
-                        phoneNumber: phoneCtrl.text.trim(),
+                        phoneNumber: normalized,
                         countryCode: countryCode,
                         relationship: relation,
                         isPrimary: isPrimary,
@@ -361,7 +371,7 @@ class _SafetyContactsScreenState extends State<SafetyContactsScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Add family members, partners or friends. When you arrive at your destination, YatraSaathi prepares an automated check-in message for them.',
+              'Add family members, partners or friends. When you arrive at your destination, STOP Vanthachu prepares an automated check-in message for them.',
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: colorScheme.onSurfaceVariant,
               ),
@@ -483,6 +493,23 @@ class _SafetyContactsScreenState extends State<SafetyContactsScreen> {
                   widget.repository.setPrimaryContact(contact.id).then((_) {
                     _loadContacts();
                   });
+                } else if (val == 'whatsapp') {
+                  const messaging = CompliantSmsMessagingService();
+                  messaging.sendWhatsAppMessage(
+                    phoneNumber: contact.formattedPhoneNumber,
+                    message: 'Hi ${contact.name}, I have set you as an emergency contact on STOP Vanthachu.',
+                  ).then((status) {
+                    if (status == MessageDeliveryStatus.failed && mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Could not open WhatsApp. Ensure WhatsApp is installed. WhatsApp account existence can only be confirmed inside WhatsApp.',
+                          ),
+                          backgroundColor: Colors.orange,
+                        ),
+                      );
+                    }
+                  });
                 } else if (val == 'edit') {
                   _showAddEditDialog(contact);
                 } else if (val == 'delete') {
@@ -501,6 +528,16 @@ class _SafetyContactsScreenState extends State<SafetyContactsScreen> {
                       ],
                     ),
                   ),
+                const PopupMenuItem(
+                  value: 'whatsapp',
+                  child: Row(
+                    children: [
+                      Icon(Icons.chat_bubble_outline, color: Colors.green, size: 18),
+                      SizedBox(width: 8),
+                      Text('Open WhatsApp Chat'),
+                    ],
+                  ),
+                ),
                 const PopupMenuItem(
                   value: 'edit',
                   child: Row(

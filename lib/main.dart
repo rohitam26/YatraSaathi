@@ -5,6 +5,7 @@ import 'services/alarm_service.dart';
 import 'services/journey_repository.dart';
 import 'services/journey_tracking_service.dart';
 import 'services/location_service.dart';
+import 'services/nearest_station_service.dart';
 import 'ui/active_journey_screen.dart';
 import 'ui/first_launch_onboarding_screen.dart';
 import 'ui/journey_wizard_screen.dart';
@@ -19,7 +20,9 @@ void main() {
   runApp(const YatraSaathiApp());
 }
 
-/// The root application widget for YatraSaathi.
+/// The root application widget for STOP Vanthachu (formerly YatraSaathi).
+typedef StopVanthachuApp = YatraSaathiApp;
+
 class YatraSaathiApp extends StatefulWidget {
   const YatraSaathiApp({
     super.key,
@@ -65,7 +68,7 @@ class _YatraSaathiAppState extends State<YatraSaathiApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'YatraSaathi',
+      title: 'STOP Vanthachu',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
@@ -73,12 +76,34 @@ class _YatraSaathiAppState extends State<YatraSaathiApp> {
           seedColor: const Color(0xFF1E88E5),
           brightness: Brightness.light,
         ),
+        cardTheme: CardThemeData(
+          elevation: 1,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          clipBehavior: Clip.antiAlias,
+        ),
+        appBarTheme: const AppBarTheme(
+          centerTitle: false,
+          elevation: 0,
+        ),
       ),
       darkTheme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color(0xFF1E88E5),
           brightness: Brightness.dark,
+        ),
+        cardTheme: CardThemeData(
+          elevation: 1,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          clipBehavior: Clip.antiAlias,
+        ),
+        appBarTheme: const AppBarTheme(
+          centerTitle: false,
+          elevation: 0,
         ),
       ),
       themeMode: ThemeMode.system,
@@ -96,7 +121,7 @@ class _YatraSaathiAppState extends State<YatraSaathiApp> {
   }
 }
 
-/// The home dashboard screen for YatraSaathi.
+/// The home dashboard screen for STOP Vanthachu.
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
     super.key,
@@ -118,6 +143,8 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Journey> _savedJourneys = [];
   bool _isLoading = true;
   int _currentTabIndex = 0;
+  NearestStationResult? _nearestStationResult;
+  bool _isLoadingLocation = false;
 
   @override
   void initState() {
@@ -144,6 +171,31 @@ class _HomeScreenState extends State<HomeScreen> {
         _activeJourney = active;
         _isLoading = false;
       });
+    }
+    _refreshNearestStation();
+  }
+
+  Future<void> _refreshNearestStation() async {
+    if (_isLoadingLocation) return;
+    setState(() => _isLoadingLocation = true);
+    try {
+      final reading = await _trackingService.locationService.getCurrentReading();
+      final result = NearestStationService().calculateNearestStation(reading);
+      if (mounted) {
+        setState(() {
+          _nearestStationResult = result;
+          _isLoadingLocation = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _nearestStationResult = NearestStationResult.unavailable(
+            reason: 'Location fix unavailable. Please check GPS settings.',
+          );
+          _isLoadingLocation = false;
+        });
+      }
     }
   }
 
@@ -264,6 +316,10 @@ class _HomeScreenState extends State<HomeScreen> {
                       children: [
                         // Warm Greeting Header
                         _buildGreetingHeader(theme, colorScheme),
+                        const SizedBox(height: 14),
+
+                        // Real-time Station Proximity Card (No false "Near Central" defaults)
+                        _buildNearbyStationCard(theme, colorScheme),
                         const SizedBox(height: 16),
 
                         // Prominent Hero Card to Plan a Journey
@@ -331,7 +387,7 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: _currentTabIndex == 0
           ? AppBar(
               title: const Text(
-                'YatraSaathi',
+                'STOP Vanthachu',
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
               centerTitle: false,
@@ -420,7 +476,7 @@ class _HomeScreenState extends State<HomeScreen> {
             Icon(Icons.directions_transit, color: colorScheme.primary, size: 26),
             const SizedBox(width: 8),
             Text(
-              'YatraSaathi Companion',
+              'STOP Vanthachu',
               style: theme.textTheme.headlineSmall?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
@@ -429,12 +485,120 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         const SizedBox(height: 4),
         Text(
-          'Your journey. Your check-ins. Your peace of mind.',
+          'Never Miss Your Stop. Travel with Confidence.',
           style: theme.textTheme.bodyMedium?.copyWith(
             color: colorScheme.onSurfaceVariant,
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildNearbyStationCard(ThemeData theme, ColorScheme colorScheme) {
+    final result = _nearestStationResult;
+    final isAcquiring = _isLoadingLocation && result == null;
+
+    Color badgeColor;
+    IconData icon;
+    if (result == null || result.proximityType == StationProximityType.unavailable) {
+      badgeColor = Colors.blueGrey;
+      icon = Icons.gps_not_fixed;
+    } else if (result.proximityType == StationProximityType.atStation) {
+      badgeColor = Colors.green;
+      icon = Icons.train;
+    } else if (result.proximityType == StationProximityType.nearStation) {
+      badgeColor = Colors.blue;
+      icon = Icons.near_me;
+    } else {
+      badgeColor = Colors.orange;
+      icon = Icons.explore_outlined;
+    }
+
+    final title = result?.displayTitle ?? (isAcquiring ? 'Finding your location...' : 'Acquiring GPS fix...');
+    final subtitle = result?.displaySubtitle ?? 'Waiting for high-accuracy satellite fix';
+
+    return Card(
+      elevation: 1,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(14.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: badgeColor.withAlpha(35),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(icon, color: badgeColor, size: 22),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: _isLoadingLocation
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.refresh, size: 18),
+                  tooltip: 'Refresh Location',
+                  onPressed: _refreshNearestStation,
+                ),
+              ],
+            ),
+            if (result?.reading != null) ...[
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: colorScheme.surfaceContainerHighest.withAlpha(100),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.satellite_alt_outlined, size: 12, color: Colors.blueGrey),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'Accuracy: ±${result!.reading!.accuracyMeters.toStringAsFixed(0)}m  •  Fix: ${result.reading!.age().inSeconds}s ago',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: colorScheme.onSurfaceVariant,
+                          fontFamily: 'monospace',
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 

@@ -12,6 +12,7 @@ class AlarmConfig {
     this.snoozeDurationMinutes = 5,
     this.repeatIntervalSeconds = 30,
     this.maxRepeats = 3,
+    this.gradualVolumeRampUp = false,
     this.isDismissed = false,
     this.isSnoozed = false,
     this.snoozedUntil,
@@ -31,6 +32,7 @@ class AlarmConfig {
   final int snoozeDurationMinutes;
   final int repeatIntervalSeconds;
   final int maxRepeats;
+  final bool gradualVolumeRampUp;
   final bool isDismissed;
   final bool isSnoozed;
   final DateTime? snoozedUntil;
@@ -44,6 +46,7 @@ class AlarmConfig {
     int? snoozeDurationMinutes,
     int? repeatIntervalSeconds,
     int? maxRepeats,
+    bool? gradualVolumeRampUp,
     bool? isDismissed,
     bool? isSnoozed,
     DateTime? snoozedUntil,
@@ -59,6 +62,7 @@ class AlarmConfig {
       repeatIntervalSeconds:
           repeatIntervalSeconds ?? this.repeatIntervalSeconds,
       maxRepeats: maxRepeats ?? this.maxRepeats,
+      gradualVolumeRampUp: gradualVolumeRampUp ?? this.gradualVolumeRampUp,
       isDismissed: isDismissed ?? this.isDismissed,
       isSnoozed: isSnoozed ?? this.isSnoozed,
       snoozedUntil: snoozedUntil ?? this.snoozedUntil,
@@ -75,6 +79,7 @@ class AlarmConfig {
       'snoozeDurationMinutes': snoozeDurationMinutes,
       'repeatIntervalSeconds': repeatIntervalSeconds,
       'maxRepeats': maxRepeats,
+      'gradualVolumeRampUp': gradualVolumeRampUp,
       'isDismissed': isDismissed,
       'isSnoozed': isSnoozed,
       'snoozedUntil': snoozedUntil?.toIso8601String(),
@@ -91,6 +96,7 @@ class AlarmConfig {
       snoozeDurationMinutes: json['snoozeDurationMinutes'] as int? ?? 5,
       repeatIntervalSeconds: json['repeatIntervalSeconds'] as int? ?? 30,
       maxRepeats: json['maxRepeats'] as int? ?? 3,
+      gradualVolumeRampUp: json['gradualVolumeRampUp'] as bool? ?? false,
       isDismissed: json['isDismissed'] as bool? ?? false,
       isSnoozed: json['isSnoozed'] as bool? ?? false,
       snoozedUntil: json['snoozedUntil'] != null
@@ -112,6 +118,7 @@ class AlarmConfig {
           snoozeDurationMinutes == other.snoozeDurationMinutes &&
           repeatIntervalSeconds == other.repeatIntervalSeconds &&
           maxRepeats == other.maxRepeats &&
+          gradualVolumeRampUp == other.gradualVolumeRampUp &&
           isDismissed == other.isDismissed &&
           isSnoozed == other.isSnoozed &&
           snoozedUntil == other.snoozedUntil;
@@ -126,6 +133,7 @@ class AlarmConfig {
     snoozeDurationMinutes,
     repeatIntervalSeconds,
     maxRepeats,
+    gradualVolumeRampUp,
     isDismissed,
     isSnoozed,
     snoozedUntil,

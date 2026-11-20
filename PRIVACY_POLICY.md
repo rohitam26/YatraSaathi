@@ -1,30 +1,30 @@
-# Privacy Policy for YatraSaathi
+# Privacy Policy for STOP Vanthachu
 
 **Effective Date:** March 15, 2026  
-**Last Updated:** March 15, 2026  
-**Application Name:** YatraSaathi  
+**Last Updated:** November 19, 2026  
+**Application Name:** STOP Vanthachu  
 **Package Name:** `com.example.pathsaathi`  
-**Repository:** [https://github.com/rohitam26/YatraSaathi-](https://github.com/rohitam26/YatraSaathi-)
+**Repository:** [https://github.com/rohitam26/YatraSaathi](https://github.com/rohitam26/YatraSaathi)
 
 ---
 
 ## 1. Introduction
 
-YatraSaathi ("the Application", "we", "our") is an open-source, mobile travel companion built with Flutter for Android. The application is designed to help travellers and commuters monitor their journeys, prevent missed transit stops through loud arrival alarms, and easily send safety check-in messages to designated family members and emergency contacts.
+STOP Vanthachu ("the Application", "we", "our") is an open-source, mobile travel companion built with Flutter for Android. The application is designed to help travellers and commuters monitor their journeys, prevent missed transit stops through loud arrival alarms, and easily send safety check-in messages to designated family members and emergency contacts.
 
-We strongly value your privacy. This Privacy Policy provides a transparent, detailed explanation of what information YatraSaathi accesses, how that data is processed locally on your device, what minimal network communications occur, and your rights and controls as a user.
+We strongly value your privacy. This Privacy Policy provides a transparent, detailed explanation of what information STOP Vanthachu accesses, how that data is processed locally on your device, what minimal network communications occur, and your rights and controls as a user.
 
 ---
 
 ## 2. Scope of the Policy
 
-This policy applies exclusively to the YatraSaathi mobile application (package `com.example.pathsaathi`) and its open-source codebase. YatraSaathi is not backed by any private cloud servers, centralized databases, user account systems, or analytics dashboards. 
+This policy applies exclusively to the STOP Vanthachu mobile application (package `com.example.pathsaathi`) and its open-source codebase. STOP Vanthachu is not backed by any private cloud servers, centralized databases, user account systems, or analytics dashboards. 
 
 ---
 
 ## 3. Information the Application Accesses
 
-Depending on the features you configure and the permissions you grant, YatraSaathi accesses:
+Depending on the features you configure and the permissions you grant, STOP Vanthachu accesses:
 1. **Device Geographic Location:** High-accuracy GPS coordinates, accuracy estimates, bearing, speed, and timestamps.
 2. **Passenger Profile & Contact Details:** Your chosen display name, mobile phone number, emergency contacts' names, phone numbers, and custom check-in message templates.
 3. **Transit Itinerary Data:** Journey names, destination coordinates, stop addresses, and alert radii.
@@ -35,13 +35,13 @@ Depending on the features you configure and the permissions you grant, YatraSaat
 ## 4. Location Information
 
 ### 4.1 On-Device Processing
-- **Real-Time GPS Tracking:** While a journey is active, YatraSaathi requests device location updates to compute the distance remaining between your physical location and upcoming stops using the spherical Haversine formula.
+- **Real-Time GPS Tracking:** While a journey is active, STOP Vanthachu requests device location updates to compute the distance remaining between your physical location and upcoming stops using the spherical Haversine formula.
 - **GPS Noise & Accuracy Filtering:** Location samples with horizontal uncertainty greater than 65 metres are discarded to prevent erratic arrival triggers.
 - **Dwell-Time Verification:** Arrival is confirmed only when multiple consecutive GPS readings place you within the configured stop radius (e.g. 200 m, 500 m, 1 km, or 2 km) and satisfy minimum dwell time thresholds.
 - **Zero Telemetry / No Location Leakage:** **Your physical GPS coordinates are processed entirely on your device.** Your live location is never transmitted to, logged on, or shared with any developer server, third-party analytics provider, or advertising platform.
 
 ### 4.2 Background Location & Foreground Service
-To reliably alert you while your device screen is turned off or while using other applications, YatraSaathi runs an Android Foreground Service (`FOREGROUND_SERVICE_LOCATION`). A persistent, high-visibility notification appears in your Android notification drawer whenever background tracking is active. You can pause or cancel tracking at any moment directly from the active journey screen or notification.
+To reliably alert you while your device screen is turned off or while using other applications, STOP Vanthachu runs an Android Foreground Service (`FOREGROUND_SERVICE_LOCATION`). A persistent, high-visibility notification appears in your Android notification drawer whenever background tracking is active. You can pause or cancel tracking at any moment directly from the active journey screen or notification.
 
 ---
 
@@ -62,16 +62,16 @@ In the Settings and Safety Profile screens, you may optionally provide:
 
 **Storage & Access:**
 - All safety profile information is stored exclusively in private local device storage (`SharedPreferences`).
-- YatraSaathi does not automatically read your entire device address book; you manually enter or select specific contacts you wish to designate for safety check-ins.
+- STOP Vanthachu does not automatically read your entire device address book; you manually enter or select specific contacts you wish to designate for safety check-ins.
 
 ---
 
 ## 7. SMS and Safety Check-In Messages
 
-YatraSaathi supports two distinct messaging modes:
+STOP Vanthachu supports two distinct messaging modes:
 
 ### 7.1 Native SMS Composer Workflow (Default & Play Store Compliant)
-- When arrival at a destination is detected, the application generates a pre-filled check-in text (e.g. *"I have safely reached Central Station. Sent via YatraSaathi."*) and invokes the native Android SMS application using an `sms:` intent (`url_launcher`).
+- When arrival at a destination is detected, the application generates a pre-filled check-in text (e.g. *"I have safely reached Central Station. - Sent via STOP Vanthachu"*) and invokes the native Android SMS application using an `sms:` intent (`url_launcher`).
 - **You retain full control:** The native SMS app opens on your screen with the designated recipient and message pre-populated. **No message is sent automatically without your explicit action to press "Send" in your SMS client.**
 - Standard SMS/MMS carrier rates apply as determined by your mobile carrier.
 
@@ -79,13 +79,13 @@ YatraSaathi supports two distinct messaging modes:
 - For users running private or self-compiled APK builds where automatic background check-ins without screen interaction are desired, the application includes an optional direct dispatch pipeline using Android's native `SmsManager`.
 - This feature requires explicit runtime permissions (`android.permission.SEND_SMS` and `android.permission.READ_PHONE_STATE`).
 - Direct SMS is **disabled by default** and only activates if explicitly toggled on by the user within settings.
-- Message dispatch depends on carrier signal and SIM availability. YatraSaathi logs local status (`sent`, `failed`, `pending`) for diagnostic display but does not guarantee delivery.
+- Message dispatch depends on carrier signal and SIM availability. STOP Vanthachu logs local status (`sent`, `failed`, `pending`) for diagnostic display but does not guarantee delivery.
 
 ---
 
 ## 8. Map, Geocoding and Third-Party Services
 
-YatraSaathi integrates standard open-source web APIs to display map tiles and provide location search:
+STOP Vanthachu integrates standard open-source web APIs to display map tiles and provide location search:
 
 | Service / Provider | Purpose | Data Transmitted | Privacy Policy |
 | :--- | :--- | :--- | :--- |
@@ -102,7 +102,7 @@ YatraSaathi integrates standard open-source web APIs to display map tiles and pr
 All persistent application data is stored locally in the application's private sandbox on your Android device:
 - Stored using Android `SharedPreferences`.
 - Includes journey routes, stops, user settings, volume/alarm preferences, and safety contacts.
-- Data is accessible only to the YatraSaathi application and is wiped when you clear application data or uninstall the app.
+- Data is accessible only to the STOP Vanthachu application and is wiped when you clear application data or uninstall the app.
 
 ---
 
@@ -119,13 +119,13 @@ All persistent application data is stored locally in the application's private s
 
 You have complete control over your data:
 - **In-App Deletion:** You can delete individual saved journeys, remove emergency contacts, or edit your passenger profile at any time in the app settings.
-- **Complete Deletion:** Clearing application storage in your Android device settings (`Settings > Apps > YatraSaathi > Storage > Clear Data`) or uninstalling YatraSaathi permanently removes all saved journeys, profiles, and preferences from the device.
+- **Complete Deletion:** Clearing application storage in your Android device settings (`Settings > Apps > STOP Vanthachu > Storage > Clear Data`) or uninstalling STOP Vanthachu permanently removes all saved journeys, profiles, and preferences from the device.
 
 ---
 
 ## 12. Permissions and User Control
 
-YatraSaathi declares and requests the following Android permissions:
+STOP Vanthachu declares and requests the following Android permissions:
 
 | Permission | Android Identifier | Purpose & Justification |
 | :--- | :--- | :--- |
@@ -146,29 +146,29 @@ You can grant or revoke any permission at any time through Android's system sett
 
 ## 13. Children's Privacy
 
-YatraSaathi does not knowingly collect, store, or solicit personal information from children under the age of 13. The application operates offline-first and contains no age-verification mechanisms or remote account creation.
+STOP Vanthachu does not knowingly collect, store, or solicit personal information from children under the age of 13. The application operates offline-first and contains no age-verification mechanisms or remote account creation.
 
 ---
 
 ## 14. Security Practices
 
 - **Sandboxed Storage:** All user configuration is stored in private application sandboxes managed by the Android operating system.
-- **No Remote Attack Surface:** Because YatraSaathi does not host public API servers or user databases, your travel itineraries and contact information cannot be exposed through server-side breaches.
+- **No Remote Attack Surface:** Because STOP Vanthachu does not host public API servers or user databases, your travel itineraries and contact information cannot be exposed through server-side breaches.
 - **HTTPS Encryption:** All external requests for map tiles and place search queries are transmitted using encrypted HTTPS.
 
 ---
 
 ## 15. Changes to This Privacy Policy
 
-If we update YatraSaathi with new features affecting privacy or data handling, this policy will be revised accordingly. The updated version will be committed to the public GitHub repository with an updated "Last Updated" date.
+If we update STOP Vanthachu with new features affecting privacy or data handling, this policy will be revised accordingly. The updated version will be committed to the public GitHub repository with an updated "Last Updated" date.
 
 ---
 
 ## 16. Contact Information & Open-Source Inquiries
 
-YatraSaathi is an open-source project maintained by its developers. If you have questions, feedback, or privacy concerns regarding this application, please reach out:
+STOP Vanthachu is an open-source project maintained by its developers. If you have questions, feedback, or privacy concerns regarding this application, please reach out:
 
 - **Project Maintainer:** Rohit ([@rohitam26](https://github.com/rohitam26))
 - **Email:** `[Your Contact Email Placeholder — e.g., rohitam256@gmail.com]`
-- **Repository Issues:** [https://github.com/rohitam26/YatraSaathi-/issues](https://github.com/rohitam26/YatraSaathi-/issues)
-- **Source Code:** [https://github.com/rohitam26/YatraSaathi-](https://github.com/rohitam26/YatraSaathi-)
+- **Repository Issues:** [https://github.com/rohitam26/YatraSaathi/issues](https://github.com/rohitam26/YatraSaathi/issues)
+- **Source Code:** [https://github.com/rohitam26/YatraSaathi](https://github.com/rohitam26/YatraSaathi)

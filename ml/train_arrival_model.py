@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-YatraSaathi - ML Arrival Confidence Training Pipeline
+STOP Vanthachu - ML Arrival Confidence Training Pipeline
 ------------------------------------------------------
 This script implements a reproducible Machine Learning training pipeline to estimate
 arrival confidence at transit stops based on kinematic and GPS telemetry features.
@@ -208,7 +208,7 @@ def evaluate_model(
 
 def main():
     print("=" * 60)
-    print(" YatraSaathi ML Arrival Confidence Training Pipeline")
+    print(" STOP Vanthachu ML Arrival Confidence Training Pipeline")
     print("=" * 60)
 
     # 1. Generate synthetic dataset
@@ -259,7 +259,7 @@ def main():
     # 5. Export model parameters for Dart mobile runtime
     os.makedirs("ml", exist_ok=True)
     export_payload = {
-        "model_name": "YatraSaathi_ArrivalConfidence_LogReg",
+        "model_name": "STOPVanthachu_ArrivalConfidence_LogReg",
         "version": "1.0.0",
         "trained_date": "2026-11-09",
         "dataset_type": "Synthetic Transit Telemetry (Experimental)",

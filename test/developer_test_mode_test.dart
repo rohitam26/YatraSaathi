@@ -51,7 +51,7 @@ class MockDeveloperAlarmService extends AlarmService {
   }
 }
 
-class MockDeveloperMessagingService implements MessagingService {
+class MockDeveloperMessagingService extends MessagingService {
   final List<Map<String, String>> dispatchedCalls = [];
 
   @override
@@ -60,9 +60,9 @@ class MockDeveloperMessagingService implements MessagingService {
     String? nextStopName,
   }) {
     if (nextStopName != null && nextStopName.isNotEmpty) {
-      return 'Hi, I have safely reached my stop: $stopName. Continuing journey towards $nextStopName. - Sent via YatraSaathi';
+      return 'Hi, I have safely reached my stop: $stopName. Continuing journey towards $nextStopName. - Sent via STOP Vanthachu';
     }
-    return 'Hi, I have safely reached my stop: $stopName. - Sent via YatraSaathi';
+    return 'Hi, I have safely reached my stop: $stopName. - Sent via STOP Vanthachu';
   }
 
   @override

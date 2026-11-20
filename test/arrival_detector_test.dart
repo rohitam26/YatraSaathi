@@ -246,13 +246,13 @@ void main() {
         evaluationTime: baseTime,
       );
 
-      // Sample 2 moves far away at t=5s
-      final t2 = baseTime.add(const Duration(seconds: 5));
+      // Sample 2 moves outside radius (620m away) at realistic transit speed (t=15s)
+      final t2 = baseTime.add(const Duration(seconds: 15));
       final outsideRes = detector.evaluate(
         journey: testJourney,
         reading: GpsReading(
-          latitude: 28.7000,
-          longitude: 77.3000,
+          latitude: 28.6195,
+          longitude: 77.2090,
           accuracyMeters: 10.0,
           timestamp: t2,
         ),
@@ -260,8 +260,8 @@ void main() {
       );
       expect(outsideRes.status, equals(ArrivalStatus.approaching));
 
-      // Sample 3 comes back inside at t=10s
-      final t3 = baseTime.add(const Duration(seconds: 10));
+      // Sample 3 comes back inside at t=30s
+      final t3 = baseTime.add(const Duration(seconds: 30));
       final insideRes2 = detector.evaluate(
         journey: testJourney,
         reading: GpsReading(
@@ -276,6 +276,189 @@ void main() {
       // Sample count should be reset to 1
       expect(insideRes2.consecutiveSamples, equals(1));
       expect(insideRes2.status, equals(ArrivalStatus.approaching));
+    });
+
+    group('Milestone 2: Real-World Abnormal & Edge GPS Conditions', () {
+      test('rejects Null Island (0.0, 0.0) coordinates', () {
+        final nullIslandReading = GpsReading(
+          latitude: 0.0,
+          longitude: 0.0,
+          accuracyMeters: 5.0,
+          timestamp: baseTime,
+        );
+
+        final result = detector.evaluate(
+          journey: testJourney,
+          reading: nullIslandReading,
+          evaluationTime: baseTime,
+        );
+
+        expect(result.status, equals(ArrivalStatus.locationUncertain));
+        expect(result.reason, contains('Null Island'));
+      });
+
+      test('rejects future timestamps caused by device clock skew', () {
+        final futureReading = GpsReading(
+          latitude: 28.6139,
+          longitude: 77.2090,
+          accuracyMeters: 10.0,
+          timestamp: baseTime.add(const Duration(minutes: 5)),
+        );
+
+        final result = detector.evaluate(
+          journey: testJourney,
+          reading: futureReading,
+          evaluationTime: baseTime,
+        );
+
+        expect(result.status, equals(ArrivalStatus.locationUncertain));
+        expect(result.reason, contains('in the future'));
+      });
+
+      test('rejects GPS accuracy circle when too wide relative to stop radius', () {
+        final wideAccuracyReading = GpsReading(
+          latitude: 28.6139,
+          longitude: 77.2090,
+          accuracyMeters: 38.0, // under maxAcceptableAccuracyMeters (40m)
+          timestamp: baseTime,
+        );
+
+        final smallStop = targetStop.copyWith(radiusMeters: 20.0);
+        final smallJourney = testJourney.copyWith(stops: [smallStop]);
+
+        final result = detector.evaluate(
+          journey: smallJourney,
+          reading: wideAccuracyReading,
+          evaluationTime: baseTime,
+        );
+
+        expect(result.status, equals(ArrivalStatus.locationUncertain));
+        expect(result.reason, contains('too wide relative to stop radius'));
+      });
+
+      test('detects and filters sudden anomalous GPS teleportation jumps', () {
+        final jumpDetector = ArrivalDetector(
+          maxPhysicallyPossibleSpeedMps: 80.0,
+        );
+        final r1 = GpsReading(
+          latitude: 28.6139,
+          longitude: 77.2090,
+          accuracyMeters: 10.0,
+          timestamp: baseTime,
+        );
+        final res1 = jumpDetector.evaluate(
+          journey: testJourney,
+          reading: r1,
+          evaluationTime: baseTime,
+        );
+        expect(res1.status, equals(ArrivalStatus.approaching));
+
+        // Fix 2: 2 seconds later, position suddenly jumps 15 km away
+        final t2 = baseTime.add(const Duration(seconds: 2));
+        final jumpReading = GpsReading(
+          latitude: 28.7500,
+          longitude: 77.2090,
+          accuracyMeters: 10.0,
+          timestamp: t2,
+        );
+        final res2 = jumpDetector.evaluate(
+          journey: testJourney,
+          reading: jumpReading,
+          evaluationTime: t2,
+        );
+
+        expect(res2.status, equals(ArrivalStatus.locationUncertain));
+        expect(res2.reason, contains('Anomalous GPS jump detected'));
+      });
+
+      test('prevents arrival trigger when express vehicle passes through stop at high speed', () {
+        // Vehicle enters stop radius at 72 km/h (20 m/s), exceeding 12.5 m/s threshold
+        for (int sec in [0, 5, 11]) {
+          final t = baseTime.add(Duration(seconds: sec));
+          final res = detector.evaluate(
+            journey: testJourney,
+            reading: GpsReading(
+              latitude: 28.6139,
+              longitude: 77.2090,
+              accuracyMeters: 10.0,
+              speedMps: 20.0, // 72 km/h
+              timestamp: t,
+            ),
+            evaluationTime: t,
+          );
+          expect(res.status, equals(ArrivalStatus.approaching));
+          expect(res.reason, contains('Transit pass-through detected'));
+          expect(res.isArrived, isFalse);
+        }
+
+        // When vehicle decelerates to stopping speed (2 m/s = 7.2 km/h), arrival confirms
+        final tConfirm = baseTime.add(const Duration(seconds: 12));
+        final resConfirm = detector.evaluate(
+          journey: testJourney,
+          reading: GpsReading(
+            latitude: 28.6139,
+            longitude: 77.2090,
+            accuracyMeters: 10.0,
+            speedMps: 2.0, // decelerated
+            timestamp: tConfirm,
+          ),
+          evaluationTime: tConfirm,
+        );
+        expect(resConfirm.status, equals(ArrivalStatus.arrived));
+        expect(resConfirm.isArrived, isTrue);
+      });
+
+      test('nearby stop disambiguation correctly prioritizes active stop in multi-stop sequence', () {
+        final stop1 = Stop(
+          id: 'stop_1',
+          name: 'Station 1',
+          latitude: 28.6139,
+          longitude: 77.2090,
+          radiusMeters: 300.0,
+          order: 0,
+        );
+        final stop2 = Stop(
+          id: 'stop_2',
+          name: 'Station 2',
+          latitude: 28.6175,
+          longitude: 77.2090,
+          radiusMeters: 300.0,
+          order: 1,
+        );
+
+        final multiStopJourney = Journey(
+          id: 'journey_multi',
+          name: 'Twin Stations',
+          createdAt: baseTime,
+          updatedAt: baseTime,
+          status: JourneyStatus.active,
+          stops: [stop1, stop2],
+          activeStopIndex: 0,
+        );
+
+        final nearStop2Reading = GpsReading(
+          latitude: 28.6170,
+          longitude: 77.2090,
+          accuracyMeters: 10.0,
+          timestamp: baseTime,
+        );
+
+        final disambiguation = detector.disambiguateStops(
+          journey: multiStopJourney,
+          reading: nearStop2Reading,
+        );
+
+        expect((disambiguation['activeStop'] as Stop).id, equals(stop1.id));
+        expect((disambiguation['closestStop'] as Stop).id, equals(stop2.id));
+        expect(disambiguation['isTargetingClosest'], isFalse);
+
+        final res = detector.evaluate(
+          journey: multiStopJourney,
+          reading: nearStop2Reading,
+          evaluationTime: baseTime,
+        );
+        expect(res.activeStop?.id, equals('stop_1'));
+      });
     });
   });
 }

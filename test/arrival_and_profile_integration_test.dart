@@ -14,7 +14,7 @@ import 'package:pathsaathi/services/journey_tracking_service.dart';
 import 'package:pathsaathi/services/location_service.dart';
 import 'package:pathsaathi/services/messaging_service.dart';
 
-class MockMessagingService implements MessagingService {
+class MockMessagingService extends MessagingService {
   int callCount = 0;
   String? lastRecipient;
   String? lastMessage;
@@ -44,9 +44,9 @@ class MockMessagingService implements MessagingService {
     String? nextStopName,
   }) {
     if (nextStopName != null && nextStopName.isNotEmpty) {
-      return 'Hi, I have safely reached my stop: $stopName. Continuing journey towards $nextStopName. - Sent via YatraSaathi';
+      return 'Hi, I have safely reached my stop: $stopName. Continuing journey towards $nextStopName. - Sent via STOP Vanthachu';
     }
-    return 'Hi, I have safely reached my stop: $stopName. - Sent via YatraSaathi';
+    return 'Hi, I have safely reached my stop: $stopName. - Sent via STOP Vanthachu';
   }
 
   @override
@@ -165,7 +165,7 @@ void main() {
       expect(msg, contains('Kavita'));
       expect(msg, contains('Central Station'));
       expect(msg, contains('Airport'));
-      expect(msg, contains('Sent via YatraSaathi'));
+      expect(msg, contains('Sent via STOP Vanthachu'));
     });
   });
 

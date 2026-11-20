@@ -13,13 +13,14 @@
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <!-- SMS Capabilities: Composer fallback (default) and Direct SMS (privately distributed APK) -->
     <uses-permission android:name="android.permission.SEND_SMS" />
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
 
     <application
-        android:label="YatraSaathi"
+        android:label="STOP Vanthachu"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

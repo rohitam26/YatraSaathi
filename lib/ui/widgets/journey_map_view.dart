@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import '../../models/journey.dart';
 import '../../models/stop.dart';
+import '../../services/offline_map_service.dart';
 
 /// Interactive map view rendering a complete multi-stop journey route.
 ///
@@ -11,18 +13,22 @@ class JourneyMapView extends StatefulWidget {
   const JourneyMapView({
     super.key,
     required this.stops,
+    this.journey,
     this.activeStop,
     this.userPosition,
     this.height = 240,
     this.isInteractive = true,
+    this.showOfflineBadge = true,
     this.onStopTapped,
   });
 
   final List<Stop> stops;
+  final Journey? journey;
   final Stop? activeStop;
   final LatLng? userPosition;
   final double height;
   final bool isInteractive;
+  final bool showOfflineBadge;
   final ValueChanged<Stop>? onStopTapped;
 
   @override
@@ -31,11 +37,46 @@ class JourneyMapView extends StatefulWidget {
 
 class _JourneyMapViewState extends State<JourneyMapView> {
   late final MapController _mapController;
+  final OfflineMapService _offlineMapService = OfflineMapService();
+  bool _isCaching = false;
 
   @override
   void initState() {
     super.initState();
     _mapController = MapController();
+  }
+
+  Future<void> _cacheRouteMap() async {
+    if (widget.journey == null || widget.stops.isEmpty || _isCaching) return;
+    setState(() => _isCaching = true);
+
+    try {
+      final count = await _offlineMapService.prefetchJourneyMap(widget.journey!);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Successfully cached $count route map tiles for offline transit monitoring.',
+            ),
+            backgroundColor: Colors.teal,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to cache map tiles: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isCaching = false);
+      }
+    }
   }
 
   LatLng _computeInitialCenter() {
@@ -54,7 +95,7 @@ class _JourneyMapViewState extends State<JourneyMapView> {
         widget.stops.first.longitude,
       );
     }
-    return const LatLng(13.0827, 80.2707); // Default fallback
+    return const LatLng(20.5937, 78.9629); // Geographic center fallback when stops are empty
   }
 
   void _fitBounds() {
@@ -112,6 +153,7 @@ class _JourneyMapViewState extends State<JourneyMapView> {
               children: [
                 TileLayer(
                   urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  tileProvider: PersistentOfflineTileProvider(offlineService: _offlineMapService),
                   userAgentPackageName: 'com.example.pathsaathi',
                   maxZoom: 19,
                 ),
@@ -205,6 +247,56 @@ class _JourneyMapViewState extends State<JourneyMapView> {
                 ),
               ],
             ),
+
+            // Offline Map Mode Badge on top left
+            if (widget.showOfflineBadge)
+              Positioned(
+                top: 8,
+                left: 8,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withAlpha(175),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.white24, width: 0.8),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.offline_pin, size: 12, color: Colors.tealAccent),
+                      SizedBox(width: 4),
+                      Text(
+                        'Offline Cache Ready',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+            // Cache Route Button overlay
+            if (widget.journey != null && widget.stops.isNotEmpty && widget.isInteractive)
+              Positioned(
+                top: 8,
+                right: (widget.stops.length > 1) ? 54 : 8,
+                child: FloatingActionButton.small(
+                  heroTag: 'journey_cache_${widget.journey!.id}',
+                  backgroundColor: colorScheme.surface.withAlpha(220),
+                  onPressed: _cacheRouteMap,
+                  tooltip: 'Download Route Map for Offline Use',
+                  child: _isCaching
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.download_for_offline_outlined, size: 20),
+                ),
+              ),
 
             // Fit All Stops Button overlay
             if (widget.isInteractive && widget.stops.length > 1)

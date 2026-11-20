@@ -102,7 +102,7 @@ class LocationService {
   Stream<GpsReading> startLocationStream({
     int distanceFilterMeters = 0,
     int intervalSeconds = 4,
-    String notificationTitle = 'YatraSaathi Journey Active',
+    String notificationTitle = 'STOP Vanthachu Journey Active',
     String notificationText = 'Monitoring arrival at upcoming stops in the background',
   }) {
     LocationSettings settings;

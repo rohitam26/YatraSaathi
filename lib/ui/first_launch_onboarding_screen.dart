@@ -138,7 +138,7 @@ class _FirstLaunchOnboardingScreenState
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'Welcome to YatraSaathi',
+                    'Welcome to STOP Vanthachu',
                     textAlign: TextAlign.center,
                     style: theme.textTheme.headlineSmall?.copyWith(
                       fontWeight: FontWeight.bold,
@@ -146,7 +146,7 @@ class _FirstLaunchOnboardingScreenState
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Your journey. Your check-ins. Your peace of mind.',
+                    'Never Miss Your Stop. Travel with Confidence.',
                     textAlign: TextAlign.center,
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
@@ -175,7 +175,7 @@ class _FirstLaunchOnboardingScreenState
                           const SizedBox(width: 12),
                           Expanded(
                             child: Text(
-                              'YatraSaathi uses your location to detect when you reach your journey stops and activate your arrival alerts. '
+                              'STOP Vanthachu uses your location to detect when you reach your journey stops and activate your arrival alerts. '
                               'Your location data is processed locally on your phone and is never uploaded to any remote server.',
                               style: theme.textTheme.bodySmall?.copyWith(height: 1.4),
                             ),
@@ -227,7 +227,7 @@ class _FirstLaunchOnboardingScreenState
                     title: '3. Arrival Notifications',
                     description: _notificationPermissionGranted
                         ? 'Notification alerts enabled.'
-                        : 'Allows YatraSaathi to wake you with high-priority chimes when you arrive.',
+                        : 'Allows STOP Vanthachu to wake you with high-priority chimes when you arrive.',
                     isComplete: _notificationPermissionGranted,
                     buttonLabel: 'Allow Alerts',
                     onAction: _handleRequestNotifications,
@@ -252,7 +252,7 @@ class _FirstLaunchOnboardingScreenState
                           const SizedBox(width: 10),
                           Expanded(
                             child: Text(
-                              'Background Tracking: When a journey is active, YatraSaathi runs a foreground service so alarms trigger even if your screen is off or the phone is in your bag.',
+                              'Background Tracking: When a journey is active, STOP Vanthachu runs a foreground service so alarms trigger even if your screen is off or the phone is in your bag.',
                               style: theme.textTheme.bodySmall?.copyWith(fontSize: 11.5),
                             ),
                           ),

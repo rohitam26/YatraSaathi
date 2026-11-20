@@ -1,12 +1,15 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:latlong2/latlong.dart';
 import '../models/contact_checkin_config.dart';
 import '../models/journey.dart';
 import '../models/stop.dart';
+import '../services/eta_calculator.dart';
 import '../services/journey_tracking_service.dart';
 import '../services/messaging_service.dart';
+import '../services/nearest_station_service.dart';
 import 'arrival_alert_dialog.dart';
 import 'journey_completion_screen.dart';
 import 'widgets/journey_map_view.dart';
@@ -286,7 +289,12 @@ class _ActiveJourneyScreenState extends State<ActiveJourneyScreen> {
     Color fg;
     IconData icon;
 
-    if (_state.isPaused) {
+    if (_state.isMissedStop) {
+      text = 'MISSED STOP WARNING';
+      bg = Colors.red.shade100;
+      fg = Colors.red.shade900;
+      icon = Icons.warning_amber_rounded;
+    } else if (_state.isPaused) {
       text = 'JOURNEY PAUSED';
       bg = Colors.amber.shade100;
       fg = Colors.amber.shade900;
@@ -456,6 +464,54 @@ class _ActiveJourneyScreenState extends State<ActiveJourneyScreen> {
                 ),
               ],
             ),
+            if (_state.estimatedDurationRemaining != null) ...[
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: colorScheme.primary.withAlpha(25),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.schedule, size: 14, color: colorScheme.primary),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Est. Arrival: ${EtaCalculator.formatEta(_state.estimatedDurationRemaining)}',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: colorScheme.primary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            if (_state.lastReading?.isDeadReckoning == true) ...[
+              const SizedBox(height: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: Colors.amber.withAlpha(40),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.tune, size: 12, color: Colors.amber),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Tunnel Dead Reckoning Projection',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: Colors.amber.shade900,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -674,6 +730,12 @@ class _ActiveJourneyScreenState extends State<ActiveJourneyScreen> {
         icon = Icons.check_circle_outline;
         statusColor = Colors.green;
         break;
+      case MessageDeliveryStatus.whatsAppOpened:
+        statusTitle = 'WHATSAPP OPENED';
+        statusDescription = 'WhatsApp chat opened with prefilled alert message.';
+        icon = Icons.chat_bubble_outline;
+        statusColor = Colors.teal;
+        break;
       case MessageDeliveryStatus.failed:
         statusTitle = 'NOTICE / FAILED';
         statusDescription = 'Could not launch SMS composer or invalid phone number. Tap below to retry.';
@@ -808,6 +870,44 @@ class _ActiveJourneyScreenState extends State<ActiveJourneyScreen> {
                     ),
                   ),
                 ],
+                if (_state.escalationCountdownSeconds != null) ...[
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withAlpha(20),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.red.withAlpha(80)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.timer_outlined, color: Colors.red, size: 18),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Auto-Escalation Countdown: ${_state.escalationCountdownSeconds}s\nIf unacknowledged, SOS alert will be sent with live coordinates.',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              fontSize: 11,
+                              color: Colors.red.shade800,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 10),
+                FilledButton.icon(
+                  onPressed: () => _showEmergencySosSheet(stop),
+                  icon: const Icon(Icons.emergency_share, size: 16),
+                  label: const Text('EMERGENCY SOS: Send Location Now'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.red.shade700,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
                 if (status == MessageDeliveryStatus.readyToSend ||
                     status == MessageDeliveryStatus.composerOpened)
                   Align(
@@ -1090,4 +1190,568 @@ class _ActiveJourneyScreenState extends State<ActiveJourneyScreen> {
       ),
     );
   }
+
+  void _showEmergencySosSheet(Stop? currentStop) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _EmergencySosSheet(
+        trackingService: widget.trackingService,
+        currentStop: currentStop,
+      ),
+    );
+  }
 }
+
+/// Interactive modal sheet managing the Emergency SOS countdown,
+/// automatic transmission, status confirmation, and WhatsApp dispatch.
+class _EmergencySosSheet extends StatefulWidget {
+  const _EmergencySosSheet({
+    required this.trackingService,
+    this.currentStop,
+  });
+
+  final JourneyTrackingService trackingService;
+  final Stop? currentStop;
+
+  @override
+  State<_EmergencySosSheet> createState() => _EmergencySosSheetState();
+}
+
+class _EmergencySosSheetState extends State<_EmergencySosSheet> {
+  int _countdown = 5;
+  Timer? _countdownTimer;
+  bool _isCountingDown = true;
+  bool _isDispatching = false;
+  MessageDeliveryStatus? _resultStatus;
+  String _formattedMessage = '';
+  String _contactName = '';
+  String _contactPhone = '';
+  bool _isDirectSms = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSosDetailsAndStartCountdown();
+  }
+
+  @override
+  void dispose() {
+    _countdownTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _loadSosDetailsAndStartCountdown() async {
+    final repo = widget.trackingService.repository;
+    final profile = await repo.getUserProfile();
+    final reading = widget.trackingService.lastReading;
+
+    final effectiveContacts = widget.currentStop != null
+        ? await widget.trackingService.getEffectiveContactsForStop(widget.currentStop!)
+        : <ContactCheckInConfig>[];
+
+    ContactCheckInConfig? target;
+    if (effectiveContacts.isNotEmpty) {
+      target = effectiveContacts.first;
+    } else {
+      target = profile.toDefaultContactConfig();
+    }
+
+    String? nearestLandmark;
+    if (reading != null) {
+      final stationResult = NearestStationService().calculateNearestStation(reading);
+      if (stationResult.isNearby && stationResult.nearestStation != null) {
+        nearestLandmark = '${stationResult.nearestStation!.name} (${stationResult.formattedDistance} away)';
+      }
+    }
+    nearestLandmark ??= widget.currentStop?.name;
+
+    final msg = profile.formatEmergencySosMessage(
+      latitude: reading?.latitude,
+      longitude: reading?.longitude,
+      accuracyMeters: reading?.accuracyMeters,
+      sampleAge: reading?.age(),
+      nearestLandmark: nearestLandmark,
+      timestamp: reading?.timestamp ?? DateTime.now(),
+    );
+
+    if (mounted) {
+      setState(() {
+        _formattedMessage = msg;
+        _contactName = target?.contactName ?? profile.defaultContactName;
+        _contactPhone = target?.phoneNumber ?? profile.defaultContactPhone;
+        _isDirectSms = profile.isDirectSmsActive;
+      });
+
+      _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        if (!mounted) {
+          timer.cancel();
+          return;
+        }
+        if (_countdown > 1) {
+          setState(() => _countdown--);
+        } else {
+          timer.cancel();
+          setState(() {
+            _countdown = 0;
+            _isCountingDown = false;
+          });
+          _executeDispatch();
+        }
+      });
+    }
+  }
+
+  Future<void> _executeDispatch() async {
+    if (_isDispatching) return;
+    setState(() {
+      _isCountingDown = false;
+      _isDispatching = true;
+    });
+
+    final status = await widget.trackingService.triggerDirectEmergencySos();
+    if (mounted) {
+      setState(() {
+        _isDispatching = false;
+        _resultStatus = status;
+      });
+    }
+  }
+
+  void _cancelSos() {
+    _countdownTimer?.cancel();
+    Navigator.of(context).pop();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Emergency SOS cancelled. No message was sent.'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+  }
+
+  Future<void> _sendViaWhatsApp() async {
+    if (_contactPhone.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No emergency contact phone number configured.')),
+      );
+      return;
+    }
+
+    final status = await widget.trackingService.messagingService.sendWhatsAppMessage(
+      phoneNumber: _contactPhone,
+      message: _formattedMessage,
+    );
+
+    if (mounted) {
+      if (status == MessageDeliveryStatus.whatsAppOpened) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Opening WhatsApp with emergency coordinates...'),
+            backgroundColor: Colors.teal,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not open WhatsApp. Ensure WhatsApp is installed on device.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: EdgeInsets.only(
+        left: 20,
+        right: 20,
+        top: 20,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Top grab handle
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: Colors.grey.withAlpha(80),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+
+            // Header Banner
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade100,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.emergency, color: Colors.red.shade800, size: 28),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'EMERGENCY SOS ALERT',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.red.shade800,
+                        ),
+                      ),
+                      Text(
+                        _isCountingDown
+                            ? 'Safety dispatch countdown active'
+                            : (_isDispatching ? 'Transmitting coordinates...' : 'Alert Status Summary'),
+                        style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey.shade700),
+                      ),
+                    ],
+                  ),
+                ),
+                if (!_isCountingDown && !_isDispatching)
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // 1. COUNTDOWN STATE
+            if (_isCountingDown) ...[
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.red.shade200, width: 1.5),
+                ),
+                child: Column(
+                  children: [
+                    Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        SizedBox(
+                          width: 80,
+                          height: 80,
+                          child: CircularProgressIndicator(
+                            value: _countdown / 5.0,
+                            strokeWidth: 6,
+                            color: Colors.red.shade700,
+                            backgroundColor: Colors.red.shade100,
+                          ),
+                        ),
+                        Text(
+                          '$_countdown',
+                          style: TextStyle(
+                            fontSize: 34,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.red.shade800,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    Text(
+                      'Dispatching SOS in $_countdown seconds...',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'To: ${_contactName.isNotEmpty ? _contactName : "Emergency Contact"} (${_contactPhone.isNotEmpty ? _contactPhone : "Configured Number"})',
+                      style: TextStyle(fontSize: 13, color: Colors.grey.shade800),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      _isDirectSms
+                          ? 'Method: Direct Cellular SMS (Background)'
+                          : 'Method: Native Android SMS Composer',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: _isDirectSms ? Colors.green.shade800 : Colors.blue.shade800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _cancelSos,
+                      icon: const Icon(Icons.cancel_outlined, color: Colors.red),
+                      label: const Text('Cancel Alert', style: TextStyle(color: Colors.red)),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        side: const BorderSide(color: Colors.red),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: () {
+                        _countdownTimer?.cancel();
+                        _executeDispatch();
+                      },
+                      icon: const Icon(Icons.send),
+                      label: const Text('Send Immediately'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Colors.red.shade700,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+
+            // 2. DISPATCHING STATE
+            if (_isDispatching) ...[
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 32),
+                child: Column(
+                  children: [
+                    CircularProgressIndicator(color: Colors.red),
+                    SizedBox(height: 16),
+                    Text(
+                      'Dispatching Emergency Coordinates...',
+                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                    ),
+                    SizedBox(height: 6),
+                    Text(
+                      'Connecting to cellular radio and formatting satellite fix...',
+                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+
+            // 3. POST-DISPATCH CONFIRMATION STATE
+            if (!_isCountingDown && !_isDispatching && _resultStatus != null) ...[
+              _buildResultBanner(theme, colorScheme),
+              const SizedBox(height: 14),
+
+              // Contact detail
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: colorScheme.surfaceContainerHighest.withAlpha(120),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.person_pin, size: 20, color: Colors.blueGrey),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Recipient: ${_contactName.isNotEmpty ? _contactName : "Safety Contact"} ($_contactPhone)',
+                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // Formatted message preview box
+              Text(
+                'Exact Dispatched Content:',
+                style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 6),
+              Container(
+                constraints: const BoxConstraints(maxHeight: 140),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.grey.shade300),
+                ),
+                child: SingleChildScrollView(
+                  child: SelectableText(
+                    _formattedMessage,
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 11,
+                      color: Colors.grey.shade900,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+
+              // Copy message action
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: () {
+                    Clipboard.setData(ClipboardData(text: _formattedMessage));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Emergency message copied to clipboard.'),
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.copy, size: 14),
+                  label: const Text('Copy Message Text', style: TextStyle(fontSize: 11)),
+                ),
+              ),
+              const SizedBox(height: 10),
+
+              // Action buttons: WhatsApp + Resend + Close
+              Row(
+                children: [
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: _sendViaWhatsApp,
+                      icon: const Icon(Icons.chat, size: 18),
+                      label: const Text('Send via WhatsApp'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF25D366),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                  ),
+                  if (_resultStatus == MessageDeliveryStatus.failed) ...[
+                    const SizedBox(width: 8),
+                    IconButton.filledTonal(
+                      tooltip: 'Retry Dispatch',
+                      onPressed: _executeDispatch,
+                      icon: const Icon(Icons.refresh),
+                    ),
+                  ],
+                ],
+              ),
+              const SizedBox(height: 10),
+              OutlinedButton(
+                onPressed: () => Navigator.of(context).pop(),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                child: const Text('Close'),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildResultBanner(ThemeData theme, ColorScheme colorScheme) {
+    Color bg;
+    Color fg;
+    IconData icon;
+    String title;
+    String description;
+
+    switch (_resultStatus) {
+      case MessageDeliveryStatus.sentConfirmed:
+        bg = Colors.green.shade50;
+        fg = Colors.green.shade900;
+        icon = Icons.check_circle;
+        title = 'AUTOMATIC SMS SENT CONFIRMED';
+        description =
+            'Cellular carrier radio confirmed direct dispatch to your safety contact.';
+        break;
+      case MessageDeliveryStatus.composerOpened:
+        bg = Colors.blue.shade50;
+        fg = Colors.blue.shade900;
+        icon = Icons.send_outlined;
+        title = 'SMS COMPOSER OPENED';
+        description =
+            'Android SMS app opened with pre-filled coordinates. Please tap Send in your SMS app to complete delivery.';
+        break;
+      case MessageDeliveryStatus.whatsAppOpened:
+        bg = Colors.teal.shade50;
+        fg = Colors.teal.shade900;
+        icon = Icons.chat_bubble;
+        title = 'WHATSAPP OPENED';
+        description = 'Emergency message loaded into WhatsApp chat.';
+        break;
+      case MessageDeliveryStatus.failed:
+      default:
+        bg = Colors.red.shade50;
+        fg = Colors.red.shade900;
+        icon = Icons.error_outline;
+        title = 'DISPATCH NOTICE / FAILED';
+        description =
+            'Could not transmit automatically or open SMS composer. Please check SIM readiness, network, or send via WhatsApp.';
+        break;
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: fg.withAlpha(60)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: fg, size: 24),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: fg,
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  description,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: fg.withAlpha(220),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+

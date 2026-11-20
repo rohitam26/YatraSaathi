@@ -17,7 +17,7 @@ import 'package:pathsaathi/services/location_service.dart';
 import 'package:pathsaathi/services/messaging_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-class MockReliabilityMessagingService implements MessagingService {
+class MockReliabilityMessagingService extends MessagingService {
   final List<Map<String, String>> dispatchedCalls = [];
 
   @override
@@ -26,9 +26,9 @@ class MockReliabilityMessagingService implements MessagingService {
     String? nextStopName,
   }) {
     if (nextStopName != null && nextStopName.isNotEmpty) {
-      return 'Hi, I have safely reached my stop: $stopName. Continuing journey towards $nextStopName. - Sent via YatraSaathi';
+      return 'Hi, I have safely reached my stop: $stopName. Continuing journey towards $nextStopName. - Sent via STOP Vanthachu';
     }
-    return 'Hi, I have safely reached my stop: $stopName. - Sent via YatraSaathi';
+    return 'Hi, I have safely reached my stop: $stopName. - Sent via STOP Vanthachu';
   }
 
   @override

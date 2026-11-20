@@ -51,7 +51,7 @@ class FakeAlarmService extends AlarmService {
   }
 }
 
-class FakeMessagingService implements MessagingService {
+class FakeMessagingService extends MessagingService {
   @override
   String formatDefaultMessage({required String stopName, String? nextStopName}) =>
       'Reached $stopName';

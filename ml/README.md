@@ -1,4 +1,4 @@
-# YatraSaathi — ML Arrival Confidence System
+# STOP Vanthachu — ML Arrival Confidence System
 
 ## 1. Objective and Architecture
 

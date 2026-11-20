@@ -13,7 +13,7 @@ void main() {
 
       expect(msg, contains('safely reached my stop: Tambaram'));
       expect(msg, contains('Continuing journey towards Chennai Beach'));
-      expect(msg, contains('YatraSaathi'));
+      expect(msg, contains('STOP Vanthachu'));
     });
 
     test('formats default arrival message correctly when destination is final', () {

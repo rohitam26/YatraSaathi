@@ -47,8 +47,10 @@ class AlarmService extends ChangeNotifier {
   Timer? _repeatTimer;
   Timer? _snoozeTimer;
   Timer? _vibrationLoopTimer;
+  Timer? _rampUpTimer;
   bool _isPlaying = false;
   int _currentRepeat = 0;
+  int _vibrationPulseCount = 0;
   AlarmConfig? _activeConfig;
   VoidCallback? _onAlarmFinished;
 
@@ -275,23 +277,55 @@ class AlarmService extends ChangeNotifier {
   Future<void> _startRingtonePlayback(AlarmConfig config) async {
     if (!config.soundEnabled) return;
 
+    _rampUpTimer?.cancel();
+    _rampUpTimer = null;
+
     try {
       final player = _getAlarmPlayer();
       if (player != null) {
         await player.stop().timeout(const Duration(seconds: 1), onTimeout: () {});
-        await player.setVolume(config.volume.clamp(0.0, 1.0));
+
+        final targetVolume = config.volume.clamp(0.0, 1.0);
+        final initialVolume = config.gradualVolumeRampUp
+            ? (targetVolume * 0.25).clamp(0.05, 1.0)
+            : targetVolume;
+
+        await player.setVolume(initialVolume);
         await player.setReleaseMode(
           config.repeatUntilDismissed ? ReleaseMode.loop : ReleaseMode.stop,
         );
 
         final assetPath = soundAssetMap[config.soundName] ?? 'sounds/classic_ring.wav';
-        debugPrint('[ALARM_SOUND] Playing AssetSource("$assetPath") via STREAM_ALARM (loop: ${config.repeatUntilDismissed})');
+        debugPrint(
+          '[ALARM_SOUND] Playing AssetSource("$assetPath") via STREAM_ALARM (loop: ${config.repeatUntilDismissed}, rampUp: ${config.gradualVolumeRampUp})',
+        );
         await player.play(AssetSource(assetPath)).timeout(
           const Duration(seconds: 4),
           onTimeout: () {
             debugPrint('[AlarmService] Audio play timeout handled.');
           },
         );
+
+        if (config.gradualVolumeRampUp && initialVolume < targetVolume) {
+          double currentVol = initialVolume;
+          const totalSteps = 8;
+          final step = (targetVolume - initialVolume) / totalSteps;
+          _rampUpTimer = Timer.periodic(const Duration(milliseconds: 1500), (timer) async {
+            if (!_isPlaying || _isDisposed) {
+              timer.cancel();
+              _rampUpTimer = null;
+              return;
+            }
+            currentVol = (currentVol + step).clamp(0.0, targetVolume);
+            try {
+              await player.setVolume(currentVol);
+            } catch (_) {}
+            if (currentVol >= targetVolume) {
+              timer.cancel();
+              _rampUpTimer = null;
+            }
+          });
+        }
       }
     } catch (e) {
       debugPrint('[AlarmService] Audio playback notice (handled): $e');
@@ -299,16 +333,35 @@ class AlarmService extends ChangeNotifier {
   }
 
   void _startVibrationLoop() {
+    _vibrationPulseCount = 0;
     _stopVibrationLoop();
-    _executeVibration();
+    _executeVibrationWithCadence();
     // Re-pulse vibration every 3 seconds while alarm is active
     _vibrationLoopTimer = Timer.periodic(const Duration(seconds: 3), (_) {
       if (_isPlaying && (_activeConfig?.vibrationEnabled ?? false)) {
-        _executeVibration();
+        _vibrationPulseCount++;
+        _executeVibrationWithCadence();
       } else {
         _stopVibrationLoop();
       }
     });
+  }
+
+  void _executeVibrationWithCadence() {
+    final isGradual = _activeConfig?.gradualVolumeRampUp ?? false;
+    List<int> pattern;
+    if (isGradual) {
+      if (_vibrationPulseCount == 0) {
+        pattern = const [0, 250, 400, 250]; // Gentle initial pulse
+      } else if (_vibrationPulseCount == 1) {
+        pattern = const [0, 400, 250, 400]; // Moderate intermediate pulse
+      } else {
+        pattern = const [0, 500, 200, 800]; // Full urgent alert pulse
+      }
+    } else {
+      pattern = const [0, 500, 200, 800];
+    }
+    _executeVibration(pattern: pattern);
   }
 
   void _stopVibrationLoop() {
@@ -390,6 +443,9 @@ class AlarmService extends ChangeNotifier {
   void stopAlarm() {
     _repeatTimer?.cancel();
     _repeatTimer = null;
+    _rampUpTimer?.cancel();
+    _rampUpTimer = null;
+    _vibrationPulseCount = 0;
     _stopVibrationLoop();
     _isPlaying = false;
     try {
@@ -480,8 +536,18 @@ class AlarmService extends ChangeNotifier {
     return notificationService.postTestNotification();
   }
 
+  bool _isDisposed = false;
+
+  @override
+  void notifyListeners() {
+    if (!_isDisposed) {
+      super.notifyListeners();
+    }
+  }
+
   @override
   void dispose() {
+    _isDisposed = true;
     stopAlarm();
     stopPreview();
     _snoozeTimer?.cancel();

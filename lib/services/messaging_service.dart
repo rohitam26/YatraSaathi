@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'direct_sms_service.dart';
+import 'phone_number_helper.dart';
 
 /// Honest delivery status of an arrival check-in message.
 enum MessageDeliveryStatus {
@@ -11,6 +12,7 @@ enum MessageDeliveryStatus {
   sentConfirmed,
   failed,
   userCancelled,
+  whatsAppOpened,
 }
 
 /// Operational messaging mode for safety check-ins.
@@ -35,6 +37,11 @@ abstract class MessagingService {
     bool sendDirect = false,
   });
 
+  Future<MessageDeliveryStatus> sendWhatsAppMessage({
+    required String phoneNumber,
+    required String message,
+  }) async => MessageDeliveryStatus.whatsAppOpened;
+
   String formatDefaultMessage({
     required String stopName,
     String? nextStopName,
@@ -46,6 +53,7 @@ abstract class MessagingService {
 /// Comprehensive Android implementation of [MessagingService] supporting both:
 /// 1. Native SMS Composer (Default, zero restricted permissions, compliant fallback).
 /// 2. Direct Background SMS via [DirectSmsService] (for opted-in contacts when consent is granted).
+/// 3. WhatsApp Click-to-Chat deep linking via official wa.me and Android intent scheme.
 class CompliantSmsMessagingService implements MessagingService {
   const CompliantSmsMessagingService({
     this.directSmsService = const DirectSmsService(),
@@ -59,17 +67,74 @@ class CompliantSmsMessagingService implements MessagingService {
     String? nextStopName,
   }) {
     if (nextStopName != null && nextStopName.isNotEmpty) {
-      return 'Hi, I have safely reached my stop: $stopName. Continuing journey towards $nextStopName. - Sent via YatraSaathi';
+      return 'Hi, I have safely reached my stop: $stopName. Continuing journey towards $nextStopName. - Sent via STOP Vanthachu';
     }
-    return 'Hi, I have safely reached my stop: $stopName. - Sent via YatraSaathi';
+    return 'Hi, I have safely reached my stop: $stopName. - Sent via STOP Vanthachu';
   }
 
   @override
   String maskPhoneNumber(String rawPhone) {
-    final clean = rawPhone.trim();
-    if (clean.length <= 4) return '****';
-    final visiblePart = clean.substring(clean.length - 4);
-    return '***-***-$visiblePart';
+    return PhoneNumberHelper.maskPhoneNumber(rawPhone);
+  }
+
+  @override
+  Future<MessageDeliveryStatus> sendWhatsAppMessage({
+    required String phoneNumber,
+    required String message,
+  }) async {
+    final cleanPhone = PhoneNumberHelper.cleanRawNumber(phoneNumber);
+    if (!PhoneNumberHelper.isValidFormat(cleanPhone)) {
+      debugPrint('[MessagingService] Invalid phone number format for WhatsApp: "$phoneNumber"');
+      return MessageDeliveryStatus.failed;
+    }
+
+    final messageText = message.trim();
+    if (messageText.isEmpty) {
+      debugPrint('[MessagingService] Cannot send empty WhatsApp message.');
+      return MessageDeliveryStatus.failed;
+    }
+
+    try {
+      // 1. Try native Android WhatsApp scheme intent (fastest, opens directly in app)
+      final schemeUri = PhoneNumberHelper.buildWhatsAppSchemeUri(
+        phoneNumber: cleanPhone,
+        message: messageText,
+      );
+
+      if (await canLaunchUrl(schemeUri)) {
+        final launched = await launchUrl(
+          schemeUri,
+          mode: LaunchMode.externalApplication,
+        );
+        if (launched) {
+          debugPrint('[MessagingService] Native WhatsApp scheme launched successfully.');
+          return MessageDeliveryStatus.whatsAppOpened;
+        }
+      }
+
+      // 2. Fallback to official HTTPS wa.me Click-to-Chat link
+      final webUri = PhoneNumberHelper.buildWhatsAppUrl(
+        phoneNumber: cleanPhone,
+        message: messageText,
+      );
+
+      if (await canLaunchUrl(webUri)) {
+        final launched = await launchUrl(
+          webUri,
+          mode: LaunchMode.externalApplication,
+        );
+        if (launched) {
+          debugPrint('[MessagingService] WhatsApp wa.me link launched successfully.');
+          return MessageDeliveryStatus.whatsAppOpened;
+        }
+      }
+
+      debugPrint('[MessagingService] WhatsApp is not installed on this device or cannot be opened.');
+      return MessageDeliveryStatus.failed;
+    } catch (e, stack) {
+      debugPrint('[MessagingService] Exception opening WhatsApp: $e\n$stack');
+      return MessageDeliveryStatus.failed;
+    }
   }
 
   @override
@@ -81,11 +146,12 @@ class CompliantSmsMessagingService implements MessagingService {
     String? journeyName,
     bool sendDirect = false,
   }) async {
-    final trimmedPhone = phoneNumber.replaceAll(RegExp(r'[\s\-\(\)]'), '').trim();
-    if (trimmedPhone.isEmpty || trimmedPhone.length < 5) {
-      debugPrint('[MessagingService] Cannot send SMS: Invalid or empty phone number "$trimmedPhone".');
+    final cleanPhone = PhoneNumberHelper.cleanRawNumber(phoneNumber);
+    if (cleanPhone.isEmpty || !PhoneNumberHelper.isValidFormat(cleanPhone)) {
+      debugPrint('[MessagingService] Cannot send SMS: Invalid or empty phone number "$phoneNumber".');
       return MessageDeliveryStatus.failed;
     }
+    final normalizedPhone = PhoneNumberHelper.normalizeToE164(cleanPhone);
 
     final messageText = customMessage.trim().isNotEmpty
         ? customMessage.trim()
@@ -94,11 +160,11 @@ class CompliantSmsMessagingService implements MessagingService {
     // If Direct SMS is explicitly requested for this contact, attempt direct transmission
     if (sendDirect) {
       debugPrint(
-        '[MessagingService] Attempting Direct SMS dispatch to "$contactName" (${maskPhoneNumber(trimmedPhone)}) for stop "$stopName".',
+        '[MessagingService] Attempting Direct SMS dispatch to "$contactName" (${maskPhoneNumber(normalizedPhone)}) for stop "$stopName".',
       );
 
       final directResult = await directSmsService.sendDirectSms(
-        phoneNumber: trimmedPhone,
+        phoneNumber: normalizedPhone,
         message: messageText,
       );
 
@@ -117,13 +183,13 @@ class CompliantSmsMessagingService implements MessagingService {
 
     // Default & Fallback: Launch native Android SMS Composer
     debugPrint(
-      '[MessagingService] Opening native SMS composer for contact "$contactName" (${maskPhoneNumber(trimmedPhone)}) for stop "$stopName".',
+      '[MessagingService] Opening native SMS composer for contact "$contactName" (${maskPhoneNumber(normalizedPhone)}) for stop "$stopName".',
     );
 
     try {
       final uri = Uri(
         scheme: 'sms',
-        path: trimmedPhone,
+        path: normalizedPhone,
         queryParameters: <String, String>{'body': messageText},
       );
 
@@ -140,7 +206,7 @@ class CompliantSmsMessagingService implements MessagingService {
 
       // Fallback URI parsing for stubborn intent filters
       final fallbackUri = Uri.parse(
-        'sms:$trimmedPhone?body=${Uri.encodeComponent(messageText)}',
+        'sms:$normalizedPhone?body=${Uri.encodeComponent(messageText)}',
       );
       if (await canLaunchUrl(fallbackUri)) {
         await launchUrl(fallbackUri, mode: LaunchMode.externalApplication);

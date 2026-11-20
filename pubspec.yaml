@@ -1,5 +1,5 @@
 name: pathsaathi
-description: "YatraSaathi - Multi-stop journey companion and smart arrival alert app."
+description: "STOP Vanthachu - Smart Journey Monitoring and Travel Safety Application. Never Miss Your Stop. Travel with Confidence."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -35,6 +35,7 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
   shared_preferences: ^2.5.6
+  path_provider: ^2.1.5
   geolocator: ^13.0.2
   url_launcher: ^6.3.1
   audioplayers: ^6.1.0

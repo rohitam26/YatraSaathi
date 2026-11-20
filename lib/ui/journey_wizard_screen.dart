@@ -54,7 +54,7 @@ class _JourneyWizardScreenState extends State<JourneyWizardScreen> {
   final TextEditingController _contactNameController = TextEditingController();
   final TextEditingController _contactPhoneController = TextEditingController();
   final TextEditingController _checkInMessageController = TextEditingController(
-    text: 'Hi! I have safely reached my stop. - Sent via YatraSaathi',
+    text: 'Hi! I have safely reached my stop. - Sent via STOP Vanthachu',
   );
 
   UserProfile? _userProfile;
@@ -771,7 +771,7 @@ class _JourneyWizardScreenState extends State<JourneyWizardScreen> {
         const SizedBox(height: 4),
         Text(
           'Notify loved ones when you safely reach your stops. '
-          'Upon arrival, YatraSaathi opens your SMS app prefilled with this message.',
+          'Upon arrival, STOP Vanthachu opens your SMS app prefilled with this message.',
           style: theme.textTheme.bodySmall?.copyWith(
             color: colorScheme.onSurfaceVariant,
           ),
@@ -885,7 +885,7 @@ class _JourneyWizardScreenState extends State<JourneyWizardScreen> {
                   Text(
                     _checkInMessageController.text.trim().isNotEmpty
                         ? _checkInMessageController.text.trim()
-                        : 'Hi! I have safely reached my stop. - Sent via YatraSaathi',
+                        : 'Hi! I have safely reached my stop. - Sent via STOP Vanthachu',
                     style: theme.textTheme.bodySmall?.copyWith(
                       fontStyle: FontStyle.italic,
                     ),

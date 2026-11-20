@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import '../models/arrival_event.dart';
 import '../models/contact_checkin_config.dart';
@@ -8,9 +9,14 @@ import '../models/stop.dart';
 import 'alarm_service.dart';
 import 'arrival_confidence_ml.dart';
 import 'arrival_detector.dart';
+import 'dead_reckoning_service.dart';
+import 'eta_calculator.dart';
 import 'journey_repository.dart';
 import 'location_service.dart';
 import 'messaging_service.dart';
+import 'notification_service.dart';
+import 'adaptive_polling_policy.dart';
+import 'nearest_station_service.dart';
 
 /// Clear state machine representing the lifecycle of an active tracking session.
 enum TrackingState {
@@ -19,6 +25,7 @@ enum TrackingState {
   potentialArrival,
   arrivalConfirmed,
   alertTriggered,
+  missedStop,
   stopCompleted,
   journeyCompleted,
   paused,
@@ -38,6 +45,12 @@ class TrackingSessionState {
     this.confidenceScore,
     this.messageStatus = MessageDeliveryStatus.notTriggered,
     this.statusMessage = 'Tracking is idle.',
+    this.currentPollingIntervalSeconds = 3,
+    this.pollingTier = PollingTier.terminal,
+    this.estimatedDurationRemaining,
+    this.estimatedArrival,
+    this.escalationCountdownSeconds,
+    this.isEscalated = false,
   });
 
   final TrackingState state;
@@ -49,10 +62,17 @@ class TrackingSessionState {
   final ArrivalConfidenceScore? confidenceScore;
   final MessageDeliveryStatus messageStatus;
   final String statusMessage;
+  final int currentPollingIntervalSeconds;
+  final PollingTier pollingTier;
+  final Duration? estimatedDurationRemaining;
+  final DateTime? estimatedArrival;
+  final int? escalationCountdownSeconds;
+  final bool isEscalated;
 
   bool get isMonitoring => state == TrackingState.monitoring;
   bool get isPotentialArrival => state == TrackingState.potentialArrival;
   bool get isAlertActive => state == TrackingState.alertTriggered;
+  bool get isMissedStop => state == TrackingState.missedStop;
   bool get isCompleted => state == TrackingState.journeyCompleted;
   bool get isPaused => state == TrackingState.paused;
 
@@ -66,6 +86,13 @@ class TrackingSessionState {
     ArrivalConfidenceScore? confidenceScore,
     MessageDeliveryStatus? messageStatus,
     String? statusMessage,
+    int? currentPollingIntervalSeconds,
+    PollingTier? pollingTier,
+    Duration? estimatedDurationRemaining,
+    DateTime? estimatedArrival,
+    int? escalationCountdownSeconds,
+    bool clearEscalationCountdown = false,
+    bool? isEscalated,
   }) {
     return TrackingSessionState(
       state: state ?? this.state,
@@ -77,6 +104,16 @@ class TrackingSessionState {
       confidenceScore: confidenceScore ?? this.confidenceScore,
       messageStatus: messageStatus ?? this.messageStatus,
       statusMessage: statusMessage ?? this.statusMessage,
+      currentPollingIntervalSeconds:
+          currentPollingIntervalSeconds ?? this.currentPollingIntervalSeconds,
+      pollingTier: pollingTier ?? this.pollingTier,
+      estimatedDurationRemaining:
+          estimatedDurationRemaining ?? this.estimatedDurationRemaining,
+      estimatedArrival: estimatedArrival ?? this.estimatedArrival,
+      escalationCountdownSeconds: clearEscalationCountdown
+          ? null
+          : (escalationCountdownSeconds ?? this.escalationCountdownSeconds),
+      isEscalated: isEscalated ?? this.isEscalated,
     );
   }
 }
@@ -90,26 +127,58 @@ class JourneyTrackingService {
     ArrivalDetector? arrivalDetector,
     AlarmService? alarmService,
     MessagingService? messagingService,
+    NotificationService? notificationService,
+    AdaptivePollingPolicy? adaptivePolicy,
+    EtaCalculator? etaCalculator,
+    DeadReckoningEngine? deadReckoningEngine,
   })  : locationService = locationService ?? LocationService(),
-        arrivalDetector = arrivalDetector ?? ArrivalDetector(),
+        arrivalDetector = arrivalDetector ??
+            ArrivalDetector(maxPhysicallyPossibleSpeedMps: 80.0),
         alarmService = alarmService ?? AlarmService(),
-        messagingService = messagingService ?? const CompliantSmsMessagingService();
+        messagingService = messagingService ?? const CompliantSmsMessagingService(),
+        notificationService = notificationService ?? NotificationService(),
+        adaptivePolicy = adaptivePolicy ?? const AdaptivePollingPolicy(),
+        etaCalculator = etaCalculator ?? EtaCalculator(),
+        deadReckoningEngine = deadReckoningEngine ?? DeadReckoningEngine();
 
   final JourneyRepository repository;
   final LocationService locationService;
   final ArrivalDetector arrivalDetector;
   final AlarmService alarmService;
   final MessagingService messagingService;
+  final NotificationService notificationService;
+  final AdaptivePollingPolicy adaptivePolicy;
+  final EtaCalculator etaCalculator;
+  final DeadReckoningEngine deadReckoningEngine;
+
+  int _currentIntervalSeconds = 3;
+  int? _batteryLevelPercent;
+  bool _batterySaverActive = false;
+
+  int get currentIntervalSeconds => _currentIntervalSeconds;
+  int? get batteryLevelPercent => _batteryLevelPercent;
+  bool get batterySaverActive => _batterySaverActive;
+
+  void setBatteryLevel(int? percent, {bool? saverActive}) {
+    _batteryLevelPercent = percent;
+    if (saverActive != null) {
+      _batterySaverActive = saverActive;
+    }
+  }
 
   final Set<String> _alertedStopIds = <String>{};
   final Set<String> _dispatchedMessageKeys = <String>{};
+  final Map<String, double> _closestDistanceObserved = <String, double>{};
   StreamSubscription<GpsReading>? _locationSubscription;
+  Timer? _escalationTimer;
+  int? _currentEscalationCountdown;
   final _stateController = StreamController<TrackingSessionState>.broadcast();
   TrackingSessionState _currentState = const TrackingSessionState(
     state: TrackingState.idle,
   );
 
   TrackingSessionState get currentState => _currentState;
+  GpsReading? get lastReading => _currentState.lastReading;
   Stream<TrackingSessionState> get stateStream => _stateController.stream;
 
   /// Starts live monitoring for the given [journey].
@@ -117,6 +186,8 @@ class JourneyTrackingService {
     // Stop any existing tracking
     await stopTracking();
     _alertedStopIds.clear();
+    _closestDistanceObserved.clear();
+    etaCalculator.reset();
 
     final startedJourney = journey.start();
     await repository.saveJourney(startedJourney);
@@ -166,7 +237,7 @@ class JourneyTrackingService {
         .startLocationStream(
           distanceFilterMeters: 0,
           intervalSeconds: 3,
-          notificationTitle: 'YatraSaathi: ${startedJourney.name}',
+          notificationTitle: 'STOP Vanthachu: ${startedJourney.name}',
           notificationText: 'Approaching ${activeStop.name}',
         )
         .listen(
@@ -215,7 +286,7 @@ class JourneyTrackingService {
             .startLocationStream(
               distanceFilterMeters: 0,
               intervalSeconds: 3,
-              notificationTitle: 'YatraSaathi: ${active.name}',
+              notificationTitle: 'STOP Vanthachu: ${active.name}',
               notificationText: 'Approaching ${target.name}',
             )
             .listen(
@@ -224,6 +295,13 @@ class JourneyTrackingService {
                 debugPrint('[JourneyTrackingService] Location stream error: $error');
               },
             );
+
+        notificationService
+            .postSessionRecoveryNotification(
+              journeyName: active.name,
+              nextStopName: target.name,
+            )
+            .catchError((_) {});
       }
       return true;
     }
@@ -271,7 +349,83 @@ class JourneyTrackingService {
       dwellDuration: result.dwellDuration,
     );
 
+    // 2b. Compute Adaptive Location Polling interval & tier
+    final distToStop = result.distanceMeters ?? 9999.0;
+
+    // Maintain minimum distance observed for missed-stop detection
+    final prevMinDist = _closestDistanceObserved[activeStop.id];
+    final currentMinDist = (prevMinDist == null)
+        ? distToStop
+        : (distToStop < prevMinDist ? distToStop : prevMinDist);
+    _closestDistanceObserved[activeStop.id] = currentMinDist;
+
+    // Smoothed ETA calculations
+    final eta = etaCalculator.calculateEta(
+      distanceMeters: distToStop,
+      currentSpeedMps: reading.speedMps,
+    );
+    final estArrival = etaCalculator.calculateEstimatedArrival(
+      distanceMeters: distToStop,
+      currentSpeedMps: reading.speedMps,
+      referenceTime: evaluationTime ?? reading.timestamp,
+    );
+
+    // Overshoot / Missed Stop Detection:
+    // If vehicle entered approaching vicinity (within 1.5x radius or alerted)
+    // and distance now grows past radius + 500m (or 2x radius), trigger missed-stop alert.
+    final hasApproachedStop = currentMinDist <= (activeStop.radiusMeters * 1.5) ||
+        _alertedStopIds.contains(activeStop.id);
+    final overshootThreshold =
+        math.max(activeStop.radiusMeters + 500.0, activeStop.radiusMeters * 2.0);
+    final isOvershot =
+        hasApproachedStop && distToStop > overshootThreshold && !activeStop.isReached;
+
+    final recommendedInterval = adaptivePolicy.calculateIntervalSeconds(
+      distanceMeters: distToStop,
+      speedMps: reading.speedMps,
+      batteryLevelPercent: _batteryLevelPercent,
+      batterySaverActive: _batterySaverActive,
+    );
+    final tier = adaptivePolicy.resolveTier(
+      distanceMeters: distToStop,
+      batteryLevelPercent: _batteryLevelPercent,
+      batterySaverActive: _batterySaverActive,
+    );
+
+    if (recommendedInterval != _currentIntervalSeconds &&
+        _locationSubscription != null) {
+      _currentIntervalSeconds = recommendedInterval;
+      _adaptLocationStream(journey, activeStop, recommendedInterval);
+    }
+
     // 3. State Machine transitions
+    if (isOvershot && !result.isArrived) {
+      _updateState(
+        _currentState.copyWith(
+          state: TrackingState.missedStop,
+          currentStop: activeStop,
+          lastReading: reading,
+          distanceToStopMeters: distToStop,
+          arrivalResult: result,
+          confidenceScore: confidence,
+          statusMessage:
+              'Warning: You appear to have passed "${activeStop.name}" (${distToStop.toStringAsFixed(0)}m away).',
+          currentPollingIntervalSeconds: _currentIntervalSeconds,
+          pollingTier: tier,
+          estimatedDurationRemaining: eta,
+          estimatedArrival: estArrival,
+        ),
+      );
+      notificationService
+          .postMissedStopNotification(
+            stopName: activeStop.name,
+            distancePastMeters: distToStop,
+            journeyTitle: journey.name,
+          )
+          .catchError((_) {});
+      return;
+    }
+
     if (result.isArrived) {
       await _onArrivalConfirmed(journey, activeStop, reading, result, confidence);
     } else if (result.distanceMeters != null &&
@@ -285,6 +439,10 @@ class JourneyTrackingService {
           arrivalResult: result,
           confidenceScore: confidence,
           statusMessage: result.reason,
+          currentPollingIntervalSeconds: _currentIntervalSeconds,
+          pollingTier: tier,
+          estimatedDurationRemaining: eta,
+          estimatedArrival: estArrival,
         ),
       );
     } else {
@@ -297,9 +455,33 @@ class JourneyTrackingService {
           arrivalResult: result,
           confidenceScore: confidence,
           statusMessage: result.reason,
+          currentPollingIntervalSeconds: _currentIntervalSeconds,
+          pollingTier: tier,
+          estimatedDurationRemaining: eta,
+          estimatedArrival: estArrival,
         ),
       );
     }
+  }
+
+  void _adaptLocationStream(Journey journey, Stop target, int intervalSeconds) {
+    debugPrint(
+      '[AdaptivePolling] Adjusting GPS polling interval to ${intervalSeconds}s for "${target.name}"',
+    );
+    _locationSubscription?.cancel();
+    _locationSubscription = locationService
+        .startLocationStream(
+          distanceFilterMeters: 0,
+          intervalSeconds: intervalSeconds,
+          notificationTitle: 'STOP Vanthachu: ${journey.name}',
+          notificationText: 'Approaching ${target.name}',
+        )
+        .listen(
+          (reading) => processGpsReading(reading),
+          onError: (Object error) {
+            debugPrint('[JourneyTrackingService] Location stream error: $error');
+          },
+        );
   }
 
   /// Handles confirmed arrival: triggers sound/vibration and triggers check-in workflow.
@@ -355,6 +537,12 @@ class JourneyTrackingService {
         final primaryContact = effectiveContacts.first;
         await triggerCheckInForCurrentStop(targetContact: primaryContact);
       }
+    }
+
+    // 3. Initiate Emergency Escalation Countdown for unacknowledged arrival
+    // (Only for real GPS arrivals, never in developer test mode)
+    if (!result.isTestMode) {
+      await _startEscalationCountdown(journey, stop, reading);
     }
   }
 
@@ -515,9 +703,19 @@ class JourneyTrackingService {
     return [];
   }
 
+  void _cancelEscalationTimer() {
+    _escalationTimer?.cancel();
+    _escalationTimer = null;
+    _currentEscalationCountdown = null;
+  }
+
   /// Cancels check-in for the current stop and records honest userCancelled status.
   void cancelCheckIn() {
-    _updateState(_currentState.copyWith(messageStatus: MessageDeliveryStatus.userCancelled));
+    _cancelEscalationTimer();
+    _updateState(_currentState.copyWith(
+      messageStatus: MessageDeliveryStatus.userCancelled,
+      clearEscalationCountdown: true,
+    ));
     debugPrint('[JourneyTrackingService] Check-in cancelled by passenger.');
   }
 
@@ -526,6 +724,7 @@ class JourneyTrackingService {
   Future<MessageDeliveryStatus> triggerCheckInForCurrentStop({
     ContactCheckInConfig? targetContact,
   }) async {
+    _cancelEscalationTimer();
     final journey = _currentState.activeJourney;
     final stop = _currentState.currentStop ??
         journey?.nextActiveStop ??
@@ -607,6 +806,7 @@ class JourneyTrackingService {
 
   /// Advances the journey to the next active stop after current stop is acknowledged.
   Future<void> advanceToNextStop() async {
+    _cancelEscalationTimer();
     alarmService.dismiss();
 
     final journey = _currentState.activeJourney;
@@ -618,6 +818,9 @@ class JourneyTrackingService {
       DateTime.now(),
     );
     await repository.saveJourney(updatedJourney);
+
+    _closestDistanceObserved.remove(currentStop.id);
+    etaCalculator.reset();
 
     final nextStop = updatedJourney.nextActiveStop;
 
@@ -646,11 +849,13 @@ class JourneyTrackingService {
 
   /// Pauses tracking session.
   Future<void> pauseTracking() async {
+    _cancelEscalationTimer();
     final journey = _currentState.activeJourney?.pause();
     if (journey != null) {
       await repository.saveJourney(journey);
     }
     alarmService.stopAlarm();
+    await notificationService.cancelRecoveryNotification();
     final target = journey?.nextActiveStop ?? journey?.nextStop;
     _updateState(
       _currentState.copyWith(
@@ -658,6 +863,7 @@ class JourneyTrackingService {
         activeJourney: journey,
         currentStop: target,
         statusMessage: 'Tracking paused.',
+        clearEscalationCountdown: true,
       ),
     );
   }
@@ -681,7 +887,9 @@ class JourneyTrackingService {
 
   /// Cancels the tracking session.
   Future<void> cancelTracking() async {
+    _cancelEscalationTimer();
     alarmService.dismiss();
+    await notificationService.cancelRecoveryNotification();
     final journey = _currentState.activeJourney?.cancel();
     if (journey != null) {
       await repository.saveJourney(journey);
@@ -692,18 +900,257 @@ class JourneyTrackingService {
         state: TrackingState.cancelled,
         activeJourney: journey,
         statusMessage: 'Journey cancelled.',
+        clearEscalationCountdown: true,
       ),
     );
   }
 
   /// Halts location stream and cleans up resources.
   Future<void> stopTracking({bool keepActiveInRepo = true}) async {
+    _cancelEscalationTimer();
     await _locationSubscription?.cancel();
     _locationSubscription = null;
     _dispatchedMessageKeys.clear();
+    _closestDistanceObserved.clear();
+    etaCalculator.reset();
     alarmService.stopAlarm();
+    await notificationService.cancelRecoveryNotification();
     if (!keepActiveInRepo) {
       await repository.setActiveJourneyId(null);
+    }
+  }
+
+  /// Evaluates whether a dead-reckoning projection should be triggered during GPS outages (e.g. tunnels).
+  GpsReading? checkDeadReckoning({DateTime? currentTime}) {
+    final last = _currentState.lastReading;
+    if (last == null) return null;
+    final projected = deadReckoningEngine.projectPosition(
+      lastValidReading: last,
+      currentTime: currentTime,
+    );
+    if (projected != null) {
+      processGpsReading(projected, evaluationTime: currentTime);
+      return projected;
+    }
+    return null;
+  }
+
+  /// Begins the multi-tier countdown before automatically escalating to emergency contacts.
+  Future<void> _startEscalationCountdown(
+    Journey journey,
+    Stop stop,
+    GpsReading reading,
+  ) async {
+    _cancelEscalationTimer();
+    bool escalationEnabled = true;
+    int timeoutSeconds = 180;
+    try {
+      final profile = await repository.getUserProfile();
+      escalationEnabled = profile.enableEmergencyEscalation;
+      timeoutSeconds = profile.escalationTimeoutSeconds;
+    } catch (_) {}
+
+    if (!escalationEnabled || timeoutSeconds <= 0) return;
+
+    _currentEscalationCountdown = timeoutSeconds;
+    _updateState(
+      _currentState.copyWith(
+        escalationCountdownSeconds: _currentEscalationCountdown,
+        isEscalated: false,
+      ),
+    );
+
+    _escalationTimer = Timer.periodic(const Duration(seconds: 1), (timer) async {
+      if (_currentState.state != TrackingState.alertTriggered &&
+          _currentState.state != TrackingState.arrivalConfirmed) {
+        _cancelEscalationTimer();
+        return;
+      }
+
+      _currentEscalationCountdown = (_currentEscalationCountdown ?? 1) - 1;
+      if (_currentEscalationCountdown! <= 0) {
+        _cancelEscalationTimer();
+        await _dispatchEmergencyEscalation(journey, stop, reading);
+      } else {
+        _updateState(
+          _currentState.copyWith(
+            escalationCountdownSeconds: _currentEscalationCountdown,
+          ),
+        );
+      }
+    });
+  }
+
+  bool _isSosDispatching = false;
+
+  /// Dispatches the emergency escalation SMS when an arrival alert remains unacknowledged.
+  Future<void> _dispatchEmergencyEscalation(
+    Journey journey,
+    Stop stop,
+    GpsReading reading,
+  ) async {
+    _updateState(
+      _currentState.copyWith(
+        isEscalated: true,
+        escalationCountdownSeconds: 0,
+        statusMessage: 'Emergency escalation triggered: SOS dispatched for "${stop.name}".',
+      ),
+    );
+
+    final effectiveContacts = await getEffectiveContactsForStop(stop);
+    if (effectiveContacts.isEmpty) return;
+
+    final primaryContact = effectiveContacts.first;
+    String sosMessage;
+    bool useDirect = false;
+    try {
+      final profile = await repository.getUserProfile();
+      sosMessage = profile.formatEmergencySosMessage(
+        latitude: reading.latitude,
+        longitude: reading.longitude,
+        accuracyMeters: reading.accuracyMeters,
+        sampleAge: reading.age(),
+        nearestLandmark: stop.name,
+        timestamp: reading.timestamp,
+      );
+      useDirect = profile.isDirectSmsActive;
+    } catch (_) {
+      sosMessage =
+          'EMERGENCY ALERT — STOP Vanthachu\n\nI may need immediate assistance.\n\nMy current location:\nLatitude: ${reading.latitude.toStringAsFixed(6)}\nLongitude: ${reading.longitude.toStringAsFixed(6)}\n\nLocation on map: https://maps.google.com/?q=${reading.latitude},${reading.longitude}\n\nNearest verified landmark: ${stop.name}\nTime: ${reading.timestamp}\n\nPlease contact me immediately and arrange assistance if necessary.\n\nThis alert was generated by STOP Vanthachu.';
+    }
+
+    final status = await messagingService.sendCheckInMessage(
+      contactName: primaryContact.contactName,
+      phoneNumber: primaryContact.phoneNumber,
+      stopName: stop.name,
+      customMessage: sosMessage,
+      journeyName: journey.name,
+      sendDirect: useDirect,
+    );
+
+    _updateState(
+      _currentState.copyWith(
+        messageStatus: status,
+      ),
+    );
+
+    notificationService
+        .postEmergencyEscalationNotification(
+          stopName: stop.name,
+          contactName: primaryContact.contactName,
+          journeyTitle: journey.name,
+        )
+        .catchError((_) {});
+  }
+
+  /// Direct Emergency SOS button triggered immediately by passenger.
+  ///
+  /// Prevents duplicate transmissions, acquires fresh GPS telemetry, and
+  /// verifies genuine nearest landmark without hardcoded defaults.
+  Future<MessageDeliveryStatus> triggerDirectEmergencySos({
+    bool forceSendDirect = false,
+  }) async {
+    // Prevent duplicate dispatches from rapid repeated taps
+    if (_isSosDispatching) {
+      debugPrint('[JourneyTrackingService] SOS dispatch already in progress. Ignoring duplicate tap.');
+      return _currentState.messageStatus;
+    }
+    _isSosDispatching = true;
+    _updateState(_currentState.copyWith(messageStatus: MessageDeliveryStatus.pending));
+
+    try {
+      final journey = _currentState.activeJourney;
+      final currentStop = _currentState.currentStop;
+      var reading = _currentState.lastReading;
+
+      // If no reading or reading is older than 60s, attempt to acquire a fresh fix
+      if (reading == null || reading.age().inSeconds > 60) {
+        try {
+          final fresh = await locationService.getCurrentReading();
+          if (fresh != null) {
+            reading = fresh;
+          }
+        } catch (_) {}
+      }
+
+      final effectiveContacts = currentStop != null
+          ? await getEffectiveContactsForStop(currentStop)
+          : <ContactCheckInConfig>[];
+
+      ContactCheckInConfig? target;
+      if (effectiveContacts.isNotEmpty) {
+        target = effectiveContacts.first;
+      } else {
+        try {
+          final profile = await repository.getUserProfile();
+          target = profile.toDefaultContactConfig();
+        } catch (_) {}
+      }
+
+      if (target == null || target.phoneNumber.trim().isEmpty) {
+        _updateState(_currentState.copyWith(
+          messageStatus: MessageDeliveryStatus.failed,
+          statusMessage: 'Emergency SOS failed: No emergency contact configured.',
+        ));
+        return MessageDeliveryStatus.failed;
+      }
+
+      // Compute nearest verified station/landmark from actual coordinates
+      String? nearestLandmark;
+      if (reading != null) {
+        final stationResult = NearestStationService().calculateNearestStation(reading);
+        if (stationResult.isNearby && stationResult.nearestStation != null) {
+          nearestLandmark = '${stationResult.nearestStation!.name} (${stationResult.formattedDistance} away)';
+        }
+      }
+      nearestLandmark ??= currentStop?.name;
+
+      String sosMessage;
+      bool useDirect = false;
+      try {
+        final profile = await repository.getUserProfile();
+        final targetLat = reading?.latitude ?? currentStop?.latitude;
+        final targetLon = reading?.longitude ?? currentStop?.longitude;
+        sosMessage = profile.formatEmergencySosMessage(
+          latitude: targetLat,
+          longitude: targetLon,
+          accuracyMeters: reading?.accuracyMeters,
+          sampleAge: reading?.age(),
+          nearestLandmark: nearestLandmark,
+          timestamp: reading?.timestamp ?? DateTime.now(),
+        );
+        useDirect = forceSendDirect || profile.isDirectSmsActive;
+      } catch (_) {
+        final latStr = reading != null ? 'Latitude: ${reading.latitude}\nLongitude: ${reading.longitude}' : 'Location: Acquiring/Unavailable';
+        final mapLink = reading != null ? 'Location on map: https://maps.google.com/?q=${reading.latitude},${reading.longitude}' : '';
+        sosMessage = 'EMERGENCY ALERT — STOP Vanthachu\n\nI may need immediate assistance.\n\n$latStr\n$mapLink\nTime: ${DateTime.now()}\n\nPlease contact me immediately and arrange assistance if necessary.\n\nThis alert was generated by STOP Vanthachu.';
+      }
+
+      final status = await messagingService.sendCheckInMessage(
+        contactName: target.contactName,
+        phoneNumber: target.phoneNumber,
+        stopName: nearestLandmark ?? 'Active Route',
+        customMessage: sosMessage,
+        journeyName: journey?.name ?? 'Active Journey',
+        sendDirect: useDirect,
+      );
+
+      final statusMsg = status == MessageDeliveryStatus.sentConfirmed
+          ? 'Emergency SOS automatically dispatched to ${target.contactName}.'
+          : (status == MessageDeliveryStatus.composerOpened
+              ? 'SMS composer opened for ${target.contactName}. Please tap Send in your SMS app.'
+              : 'Emergency SOS dispatch failed.');
+
+      _updateState(
+        _currentState.copyWith(
+          isEscalated: true,
+          messageStatus: status,
+          statusMessage: statusMsg,
+        ),
+      );
+      return status;
+    } finally {
+      _isSosDispatching = false;
     }
   }
 
@@ -715,6 +1162,7 @@ class JourneyTrackingService {
   }
 
   void dispose() {
+    _cancelEscalationTimer();
     stopTracking();
     alarmService.dispose();
     locationService.dispose();

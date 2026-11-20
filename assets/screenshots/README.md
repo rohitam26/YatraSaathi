@@ -1,6 +1,6 @@
-# YatraSaathi Application Screenshots
+# STOP Vanthachu Application Screenshots
 
-This directory stores authentic high-resolution screenshots captured from the working YatraSaathi Flutter application running on a physical Android device.
+This directory stores authentic high-resolution screenshots captured from the working STOP Vanthachu (formerly YatraSaathi) Flutter application running on a physical Android device.
 
 The gallery contains **exactly ten supplied screenshots** showcasing the full end-to-end journey lifecycle from route creation to arrival notification and safety profile management.
 
@@ -10,7 +10,7 @@ The gallery contains **exactly ten supplied screenshots** showcasing the full en
 
 | Filename | Screen Description | Image Type | Privacy Review Status |
 | :--- | :--- | :---: | :---: |
-| `01-dashboard.png` | **Home Dashboard:** YatraSaathi companion overview, active journey card with live tracking shortcuts, and saved route management. | Genuine Android Capture | **PASSED** (No personal data or private numbers displayed) |
+| `01-dashboard.png` | **Home Dashboard:** STOP Vanthachu companion overview, active journey card with live tracking shortcuts, and saved route management. | Genuine Android Capture | **PASSED** (No personal data or private numbers displayed) |
 | `02-journey-creation.png` | **Journey Creation:** Step 1 route naming ("Office Commute"), starting point, and final destination setup wizard. | Genuine Android Capture | **PASSED** (Public station and landmark names only) |
 | `03-map-picker.png` | **Interactive Map Picker:** OpenStreetMap location picker with interactive pin dropping, place search suggestions ("central"), and address confirmation. | Genuine Android Capture | **PASSED** (Public transit landmarks and map coordinates) |
 | `04-stop-configuration.png` | **Stop Configuration:** Multi-stop management list showing configured stop ("Are Falls"), 500m alert radius, and sound controls. | Genuine Android Capture | **PASSED** (Generic travel itinerary) |
@@ -25,7 +25,7 @@ The gallery contains **exactly ten supplied screenshots** showcasing the full en
 
 ## Technical Specifications
 
-- **Source:** Genuine application captures from installed YatraSaathi Android APK.
+- **Source:** Genuine application captures from installed STOP Vanthachu Android APK.
 - **Resolution:** 720 × 1600 px (standard Android portrait ratio 9:20).
 - **Format:** Optimized lossless PNG.
 - **Privacy Standard:** Zero real phone numbers or private contact details exposed; all phone fields are fully masked with asterisks directly in the application interface.

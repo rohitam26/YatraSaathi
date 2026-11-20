@@ -4,6 +4,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import '../../services/geocoding_service.dart';
 import '../../services/location_service.dart';
+import '../../services/offline_map_service.dart';
 
 /// Full-screen interactive map location picker using OpenStreetMap tiles.
 ///
@@ -73,12 +74,16 @@ class _MapLocationPickerState extends State<MapLocationPicker> {
     _geocoding = widget.geocodingService ?? GeocodingService();
     _location = widget.locationService ?? LocationService();
 
-    // Default to initial coords or Chennai / India central default
-    final lat = widget.initialLatitude ?? 13.0827;
-    final lon = widget.initialLongitude ?? 80.2707;
+    final hasInitial = widget.initialLatitude != null && widget.initialLongitude != null;
+    final lat = widget.initialLatitude ?? 20.5937;
+    final lon = widget.initialLongitude ?? 78.9629;
     _selectedPosition = LatLng(lat, lon);
     if (widget.initialPlaceName != null && widget.initialPlaceName!.isNotEmpty) {
       _placeName = widget.initialPlaceName!;
+      _address = hasInitial ? 'Selected stop coordinate' : 'Tap to place pin';
+    } else if (!hasInitial) {
+      _placeName = 'Locating position...';
+      _address = 'Acquiring GPS fix or search above';
     }
 
     _fetchCurrentLocation();
@@ -307,6 +312,7 @@ class _MapLocationPickerState extends State<MapLocationPicker> {
             children: [
               TileLayer(
                 urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                tileProvider: PersistentOfflineTileProvider(),
                 userAgentPackageName: 'com.example.pathsaathi',
                 maxZoom: 19,
               ),
@@ -499,6 +505,35 @@ class _MapLocationPickerState extends State<MapLocationPicker> {
                     ),
                   ),
               ],
+            ),
+          ),
+
+          // Offline Cache Active Badge
+          Positioned(
+            top: 74,
+            left: 14,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.black.withAlpha(175),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white24, width: 0.8),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.offline_pin, size: 12, color: Colors.tealAccent),
+                  SizedBox(width: 4),
+                  Text(
+                    'Offline Cache Active',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
 

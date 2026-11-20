@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user_profile.dart';
 import '../services/alarm_service.dart';
+import '../services/direct_sms_service.dart';
 import '../services/journey_repository.dart';
+import '../services/offline_map_service.dart';
 import 'permission_guidance_screen.dart';
 import 'privacy_info_screen.dart';
 import 'safety_contacts_screen.dart';
@@ -35,9 +37,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final TextEditingController _defaultContactPhone = TextEditingController();
   String _defaultContactRelation = 'Emergency Contact';
   final TextEditingController _defaultMessage = TextEditingController(
-    text: 'Hi! I have safely reached my stop. - Sent via YatraSaathi',
+    text: 'Hi! I have safely reached my stop. - Sent via STOP Vanthachu',
   );
   bool _autoCheckInOnArrival = true;
+  bool _enableDirectSms = false;
+  bool _directSmsConsentGiven = false;
+  final DirectSmsService _directSmsService = const DirectSmsService();
+  final OfflineMapService _offlineMapService = OfflineMapService();
+  String _cachedTileStats = 'Calculating...';
 
   // Passenger Defaults
   String _defaultSound = 'Default Chime';
@@ -55,6 +62,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
     super.initState();
     _alarmService = widget.alarmService ?? AlarmService();
     _loadPreferences();
+    _refreshCacheStats();
+  }
+
+  Future<void> _refreshCacheStats() async {
+    final stats = await _offlineMapService.getCacheStats();
+    if (mounted) {
+      setState(() {
+        _cachedTileStats = '${stats["count"]} tiles (${stats["formattedSize"]})';
+      });
+    }
   }
 
   @override
@@ -83,6 +100,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           : 'Emergency Contact';
       _defaultMessage.text = profile.defaultMessage;
       _autoCheckInOnArrival = profile.autoCheckInOnArrival;
+      _enableDirectSms = profile.enableDirectSms;
+      _directSmsConsentGiven = profile.directSmsConsentGiven;
 
       _defaultSound = prefs.getString('pref_default_sound') ?? 'Default Chime';
       _vibrationPattern =
@@ -92,6 +111,99 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _minDwellSeconds = prefs.getInt('pref_min_dwell_seconds') ?? 10;
       _maxAccuracyMeters = prefs.getDouble('pref_max_accuracy') ?? 80.0;
     });
+  }
+
+  Future<void> _handleDirectSmsToggle(bool enabled) async {
+    if (!enabled) {
+      setState(() => _enableDirectSms = false);
+      await _savePreferences();
+      return;
+    }
+
+    final consent = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.security, color: Colors.indigo),
+            SizedBox(width: 8),
+            Text('Enable Direct Emergency SMS?'),
+          ],
+        ),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Automated Emergency SMS dispatches safety alerts directly in the background using your device cellular SIM without requiring manual app interaction during an emergency.',
+              style: TextStyle(fontSize: 13),
+            ),
+            SizedBox(height: 10),
+            Text(
+              '• Carrier charges apply according to your standard mobile SMS plan.',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 6),
+            Text(
+              '• Includes live coordinates, accuracy, and Google Maps link.',
+              style: TextStyle(fontSize: 12),
+            ),
+            SizedBox(height: 6),
+            Text(
+              '• If SMS permission is revoked or cellular SIM is unavailable, native SMS composer is used as automatic fallback.',
+              style: TextStyle(fontSize: 12),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('I Agree & Enable'),
+          ),
+        ],
+      ),
+    );
+
+    if (consent != true) {
+      return;
+    }
+
+    // Check SIM readiness
+    final simStatus = await _directSmsService.getSimStatus();
+    if (!simStatus.isAvailable && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Notice: No active cellular SIM detected. Automated SMS may fail until a SIM is inserted.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+    }
+
+    // Request runtime SEND_SMS permission
+    final granted = await _directSmsService.requestPermission();
+    if (!granted) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('SEND_SMS permission was denied. Direct SMS cannot be enabled.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
+    if (mounted) {
+      setState(() {
+        _enableDirectSms = true;
+        _directSmsConsentGiven = true;
+      });
+      await _savePreferences(showSnackbar: true);
+    }
   }
 
   Future<void> _savePreferences({bool showSnackbar = false}) async {
@@ -104,6 +216,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       defaultContactRelation: _defaultContactRelation,
       defaultMessage: _defaultMessage.text.trim(),
       autoCheckInOnArrival: _autoCheckInOnArrival,
+      enableDirectSms: _enableDirectSms,
+      directSmsConsentGiven: _directSmsConsentGiven,
     );
     await widget.repository.saveUserProfile(profile);
 
@@ -193,7 +307,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _defaultContactName.clear();
       _defaultContactPhone.clear();
       _defaultMessage.text =
-          'Hi! I have safely reached my stop. - Sent via YatraSaathi';
+          'Hi! I have safely reached my stop. - Sent via STOP Vanthachu';
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('All local data cleared successfully.')),
@@ -445,6 +559,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       _savePreferences();
                     },
                   ),
+                  const Divider(height: 20),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Direct Emergency SMS Dispatch'),
+                    subtitle: const Text(
+                      'Sends SMS in background via Android telephony radio without opening composer. Requires cellular SIM and explicit user permission.',
+                    ),
+                    value: _enableDirectSms,
+                    onChanged: (val) => _handleDirectSmsToggle(val),
+                  ),
                   const SizedBox(height: 12),
                   OutlinedButton.icon(
                     onPressed: () {
@@ -574,6 +698,62 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   },
                 ),
               ],
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Section 3b: Offline Map Storage
+          _buildSectionHeader('Offline Map Storage'),
+          Card(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.offline_pin_outlined, color: Colors.teal),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Persistent Tile Cache',
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            Text(
+                              _cachedTileStats,
+                              style: const TextStyle(fontSize: 12, color: Colors.grey),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.refresh),
+                        tooltip: 'Refresh cache size',
+                        onPressed: _refreshCacheStats,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  OutlinedButton.icon(
+                    onPressed: () async {
+                      final messenger = ScaffoldMessenger.of(context);
+                      await _offlineMapService.clearTileCache();
+                      await _refreshCacheStats();
+                      if (mounted) {
+                        messenger.showSnackBar(
+                          const SnackBar(content: Text('Offline tile cache cleared.')),
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.delete_sweep_outlined, size: 18),
+                    label: const Text('Clear Cached Map Tiles'),
+                  ),
+                ],
+              ),
             ),
           ),
           const SizedBox(height: 20),

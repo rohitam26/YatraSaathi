@@ -68,7 +68,7 @@ class _PermissionGuidanceScreenState extends State<PermissionGuidanceScreen> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'YatraSaathi processes GPS coordinates exclusively on your device. Zero telemetry is sent to any external server.',
+                          'STOP Vanthachu processes GPS coordinates exclusively on your device. Zero telemetry is sent to any external server.',
                           style: theme.textTheme.bodySmall,
                         ),
                       ],

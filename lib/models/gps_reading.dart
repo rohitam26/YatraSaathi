@@ -11,6 +11,7 @@ class GpsReading {
     required this.timestamp,
     this.speedMps,
     this.bearingDegrees,
+    this.isDeadReckoning = false,
   }) : assert(
          latitude >= -90.0 && latitude <= 90.0,
          'Latitude must be between -90 and 90 degrees',
@@ -21,12 +22,25 @@ class GpsReading {
        ),
        assert(accuracyMeters >= 0.0, 'Accuracy in meters cannot be negative');
 
+  /// Permissive constructor for raw sensor telemetry allowing domain validators
+  /// (e.g. ArrivalDetector, LocationEngine) to evaluate validity without assertion exceptions.
+  const GpsReading.raw({
+    required this.latitude,
+    required this.longitude,
+    required this.accuracyMeters,
+    required this.timestamp,
+    this.speedMps,
+    this.bearingDegrees,
+    this.isDeadReckoning = false,
+  });
+
   final double latitude;
   final double longitude;
   final double accuracyMeters;
   final DateTime timestamp;
   final double? speedMps;
   final double? bearingDegrees;
+  final bool isDeadReckoning;
 
   bool get hasValidCoordinates =>
       Stop.areCoordinatesValid(latitude, longitude);
@@ -47,6 +61,7 @@ class GpsReading {
     DateTime? timestamp,
     double? speedMps,
     double? bearingDegrees,
+    bool? isDeadReckoning,
   }) {
     return GpsReading(
       latitude: latitude ?? this.latitude,
@@ -55,6 +70,7 @@ class GpsReading {
       timestamp: timestamp ?? this.timestamp,
       speedMps: speedMps ?? this.speedMps,
       bearingDegrees: bearingDegrees ?? this.bearingDegrees,
+      isDeadReckoning: isDeadReckoning ?? this.isDeadReckoning,
     );
   }
 
@@ -66,6 +82,7 @@ class GpsReading {
       'timestamp': timestamp.toIso8601String(),
       'speedMps': speedMps,
       'bearingDegrees': bearingDegrees,
+      'isDeadReckoning': isDeadReckoning,
     };
   }
 
@@ -77,6 +94,7 @@ class GpsReading {
       timestamp: DateTime.parse(json['timestamp'] as String),
       speedMps: (json['speedMps'] as num?)?.toDouble(),
       bearingDegrees: (json['bearingDegrees'] as num?)?.toDouble(),
+      isDeadReckoning: (json['isDeadReckoning'] as bool?) ?? false,
     );
   }
 
@@ -90,7 +108,8 @@ class GpsReading {
           accuracyMeters == other.accuracyMeters &&
           timestamp == other.timestamp &&
           speedMps == other.speedMps &&
-          bearingDegrees == other.bearingDegrees;
+          bearingDegrees == other.bearingDegrees &&
+          isDeadReckoning == other.isDeadReckoning;
 
   @override
   int get hashCode => Object.hash(
@@ -100,5 +119,6 @@ class GpsReading {
     timestamp,
     speedMps,
     bearingDegrees,
+    isDeadReckoning,
   );
 }
